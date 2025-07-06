@@ -21,6 +21,9 @@ logger.info(`Environment loaded: NODE_ENV=${process.env.NODE_ENV || 'development
 logger.debug(`GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY ? '***' + process.env.GOOGLE_API_KEY.slice(-4) : 'not set'}`);
 logger.debug(`PINECONE_API_KEY=${process.env.PINECONE_API_KEY ? '***' + process.env.PINECONE_API_KEY.slice(-4) : 'not set'}`);
 logger.debug(`PINECONE_ENVIRONMENT=${process.env.PINECONE_ENVIRONMENT || 'not set'}`);
+logger.debug(`MONGODB_URI=${process.env.MONGODB_URI ? '***' + process.env.MONGODB_URI.split('@').pop() : 'not set'}`);
+logger.debug(`MONGODB_DB_NAME=${process.env.MONGODB_DB_NAME || config.mongodb.dbName}`);
+logger.debug(`MONGODB_CHAT_COLLECTION=${process.env.MONGODB_CHAT_COLLECTION || config.mongodb.chatCollection}`);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,6 +85,16 @@ setupGracefulShutdown(server, {
   timeout: 30000,
   onShutdown: async () => {
     logger.info('Performing cleanup before shutdown');
+    
+    // Shutdown chat service and close MongoDB connections
+    try {
+      const chatService = require('./services/chatService');
+      await chatService.shutdown();
+      logger.info('Chat service shutdown successfully');
+    } catch (error) {
+      logger.error('Error shutting down chat service:', error);
+    }
+    
     // Additional cleanup logic can go here
     return Promise.resolve();
   }

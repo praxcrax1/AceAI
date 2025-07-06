@@ -62,5 +62,30 @@ module.exports = {
    */
   stats: () => {
     return cache.getStats();
+  },
+  
+  /**
+   * Clear cache entries based on a pattern
+   * @param {string} pattern - Pattern to match keys (using simple wildcard matching with *)
+   * @returns {number} Number of deleted entries
+   */
+  clearPattern: (pattern) => {
+    // Get all keys
+    const keys = cache.keys();
+    
+    // Convert pattern to regex by escaping special chars and converting * to .*
+    const regexPattern = new RegExp('^' + 
+      pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+             .replace(/\*/g, '.*') + 
+      '$');
+    
+    // Filter keys matching the pattern
+    const matchingKeys = keys.filter(key => regexPattern.test(key));
+    
+    // Delete matching keys
+    const count = matchingKeys.length > 0 ? cache.del(matchingKeys) : 0;
+    
+    logger.debug(`Cache clear pattern: ${pattern}, deleted: ${count} entries`);
+    return count;
   }
 };

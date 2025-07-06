@@ -62,4 +62,81 @@ router.post('/chat', chatLimiter, async (req, res) => {
   }
 });
 
+// Route for clearing chat history
+router.delete('/chat/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'SessionId is required' });
+    }
+    
+    logger.info(`Clearing chat history for session ${sessionId}`);
+    
+    const result = await chatService.clearChatHistory(sessionId);
+    
+    if (result) {
+      // Clear any cached responses for this session
+      const cachePattern = `chat:*:${sessionId}:*`;
+      cache.clearPattern(cachePattern);
+      
+      res.json({
+        success: true,
+        message: `Chat history for session ${sessionId} cleared successfully`
+      });
+    } else {
+      res.status(500).json({
+        error: 'Failed to clear chat history'
+      });
+    }
+  } catch (error) {
+    logger.error('Error in clear chat history route:', error);
+    res.status(500).json({
+      error: 'Failed to clear chat history',
+      details: error.message
+    });
+  }
+});
+
+// Route for clearing chat history
+router.delete('/chat/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'SessionId is required' });
+    }
+    
+    logger.info(`Request to clear chat history for session: ${sessionId}`);
+    
+    // Clear the chat history
+    const success = await chatService.clearChatHistory(sessionId);
+    
+    // Also clear any cached chat responses for this session
+    const cachePattern = `chat:*:${sessionId}:*`;
+    const clearedCount = cache.clearPattern(cachePattern);
+    
+    if (success) {
+      logger.info(`Chat history cleared for session: ${sessionId}, removed ${clearedCount} cached responses`);
+      return res.json({ 
+        success: true, 
+        message: `Chat history for session ${sessionId} cleared successfully`,
+        clearedCacheEntries: clearedCount
+      });
+    } else {
+      logger.warn(`Failed to clear chat history for session: ${sessionId}`);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to clear chat history' 
+      });
+    }
+  } catch (error) {
+    logger.error('Error clearing chat history:', error);
+    res.status(500).json({
+      error: 'Failed to clear chat history',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
