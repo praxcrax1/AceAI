@@ -187,16 +187,6 @@ For the enhanced UI, we recommend:
 
 ## Design System
 
-### Colors
-
-- Primary: #3498db (Blue)
-- Secondary: #2ecc71 (Green)
-- Accent: #9b59b6 (Purple)
-- Warning: #f39c12 (Orange)
-- Danger: #e74c3c (Red)
-- Background: #f8f9fa (Light Gray)
-- Text: #333333 (Dark Gray)
-
 ### Typography
 
 - Headings: Inter, sans-serif
