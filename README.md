@@ -51,11 +51,19 @@ The script will:
    PINECONE_API_KEY=your_pinecone_api_key
    PINECONE_ENVIRONMENT=your_pinecone_environment (optional for Pinecone v6)
    PINECONE_INDEX_NAME=aceai-docs
+   MONGODB_URI=mongodb://localhost:27017
+   MONGODB_DB_NAME=aceai
+   MONGODB_CHAT_COLLECTION=chat_memory
    ```
 
 4. Create a Pinecone index named `aceai-docs` with the dimension size of 768 (for Gemini embeddings)
    
    Note: This project uses Pinecone v6 client, which handles the environment configuration differently. The `PINECONE_ENVIRONMENT` is kept for backward compatibility and informational purposes.
+   
+5. Set up MongoDB:
+   - Install MongoDB or use a cloud service like MongoDB Atlas
+   - Create a database named `aceai` (or use a name of your choice and set `MONGODB_DB_NAME`)
+   - The application will automatically create collections and indexes
 
 5. Start the server:
    ```bash
@@ -71,6 +79,7 @@ The script will:
 - Node.js 14+ (16+ recommended)
 - Google Gemini API key (for LLM and embeddings)
 - Pinecone account (for vector database)
+- MongoDB (for chat history persistence)
 - Modern web browser
 
 ## API Endpoints
@@ -147,9 +156,15 @@ curl -X POST \
   http://localhost:3000/api/chat
 ```
 
+4. Clear chat history for a session:
+```bash
+curl -X DELETE http://localhost:3000/api/chat/the-session-id
+```
+
 ## Documentation
 
 For detailed information about the project, please see:
 - [ARCHITECTURE.md](ARCHITECTURE.md): Technical architecture and implementation details
 - [UI-PLAN.md](UI-PLAN.md): UI enhancement roadmap and implementation guidelines
 - [DEVELOPMENT.md](DEVELOPMENT.md): Guide for developers contributing to the project
+- [server/docs/mongodb-integration.md](server/docs/mongodb-integration.md): MongoDB integration for chat history persistence

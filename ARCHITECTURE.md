@@ -16,6 +16,7 @@ AceAI is built using a modern JavaScript stack:
 
 ### Database
 - **Pinecone**: Vector database for storing and retrieving embeddings
+- **MongoDB**: Persistent storage for chat conversation history
 - **File System**: Local storage for document metadata
 
 ### Frontend
@@ -43,9 +44,10 @@ AceAI is built using a modern JavaScript stack:
    - LangChain's ConversationalRetrievalQAChain handles the retrieval and response generation
 
 2. **Memory & Context**:
-   - BufferMemory stores conversation history
+   - MongoDB stores conversation history persistently
    - Session management tracks user conversations
    - Caching improves response times for repeated queries
+   - In-memory fallback if MongoDB is unavailable
 
 ## Implementation Details
 
@@ -71,9 +73,11 @@ AceAI is built using a modern JavaScript stack:
 - LLM initialization (Gemini)
 - Embeddings initialization
 - Pinecone integration
+- MongoDB integration for persistent chat history
 - Session memory management
 - Question processing with RAG
 - Source extraction for citations
+- Chat history clearing functionality
 
 #### 4. Document Management (`documentStore.js`)
 - Document metadata storage
@@ -92,6 +96,7 @@ AceAI is built using a modern JavaScript stack:
 - **Error Handler** (`errorHandler.js`): Centralized error handling
 - **Rate Limiter** (`rateLimiter.js`): API protection
 - **Metrics** (`metrics.js`): Performance and usage tracking
+- **MongoDB Client** (`mongodb.js`): MongoDB connection management
 - **Graceful Shutdown** (`gracefulShutdown.js`): Clean application termination
 
 ### Configuration (`config.js`)
@@ -100,6 +105,7 @@ AceAI is built using a modern JavaScript stack:
 - Embedding configuration
 - Text splitting parameters
 - Vector search configuration
+- MongoDB connection settings
 
 ## Pinecone Integration
 
@@ -243,7 +249,22 @@ POST /api/chat
 }
 ```
 
-### 3. List Documents
+### 3. Clear Chat History
+```
+DELETE /api/chat/:sessionId
+```
+**Parameters:**
+- `sessionId`: The ID of the chat session to clear
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Chat history for session uuid-string cleared successfully"
+}
+```
+
+### 4. List Documents
 ```
 GET /api/documents
 ```
@@ -277,7 +298,7 @@ GET /api/documents
 }
 ```
 
-### 4. Get Document
+### 5. Get Document
 ```
 GET /api/documents/:id
 ```
@@ -297,7 +318,7 @@ GET /api/documents/:id
 }
 ```
 
-### 5. Delete Document
+### 6. Delete Document
 ```
 DELETE /api/documents/:id
 ```
@@ -310,7 +331,7 @@ DELETE /api/documents/:id
 }
 ```
 
-### 6. Update Document Metadata
+### 7. Update Document Metadata
 ```
 PATCH /api/documents/:id
 ```
@@ -340,7 +361,7 @@ PATCH /api/documents/:id
 }
 ```
 
-### 7. System Health
+### 8. System Health
 ```
 GET /api/admin/health
 ```
