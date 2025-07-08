@@ -31,5 +31,16 @@
     "size": 4645325,
     "processingTime": 12.099,
     "updatedAt": "2025-07-08T16:02:51.191Z"
+  },
+  {
+    "id": "81b6421e-694c-4d95-8df5-b2daec3870c1",
+    "filename": "CNP - RIP_OSPF_ BGP_2025.pdf",
+    "title": "CNP - RIP_OSPF_ BGP_2025",
+    "filePath": "/home/prakhar/Repos/AceAI/server/uploads/81b6421e-694c-4d95-8df5-b2daec3870c1.pdf",
+    "chunkCount": 150,
+    "pageCount": 150,
+    "size": 4534049,
+    "processingTime": 10.128,
+    "updatedAt": "2025-07-08T16:19:39.763Z"
   }
 ]

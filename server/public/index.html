@@ -212,10 +212,6 @@
 
         // Functions
         function handleFileUpload(file) {
-            if (file.size > 10 * 1024 * 1024) {
-                alert('File size exceeds the 10MB limit');
-                return;
-            }
 
             loadingUpload.style.display = 'block';
             uploadSuccess.style.display = 'none';

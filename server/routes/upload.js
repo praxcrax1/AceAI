@@ -11,6 +11,8 @@ const documentStore = require('../utils/documentStore');
 const { uploadLimiter } = require('../utils/rateLimiter');
 const { catchAsync, AppError } = require('../utils/errorHandler');
 const fs = require('fs');
+const uploadService = require('../services/uploadService');
+const upload = uploadService.upload;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -40,7 +42,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ 
+const uploadMiddleware = multer({ 
   storage: storage,
   fileFilter: fileFilter,
   limits: {
@@ -49,73 +51,6 @@ const upload = multer({
 });
 
 // Route for uploading PDF
-router.post('/upload', uploadLimiter, upload.single('pdf'), async (req, res) => {
-  const startTime = Date.now();
-  
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No PDF file provided' });
-    }
-
-    const filePath = req.file.path;
-    const fileId = req.fileId;
-    const originalFilename = req.file.originalname;
-
-    logger.info(`Processing uploaded PDF: ${originalFilename} (${fileId})`);
-    
-    // Process the PDF file
-    const result = await pdfProcessor.processPDF(filePath, fileId);
-    
-    const processingTime = (Date.now() - startTime) / 1000;
-    
-    // Store document metadata
-    const fileSize = req.file.size;
-    const docMetadata = {
-      id: fileId,
-      filename: originalFilename,
-      title: path.parse(originalFilename).name, // Default title is filename without extension
-      filePath: filePath,
-      chunkCount: result.chunksCount,
-      pageCount: result.pageCount || 0,
-      size: fileSize,
-      processingTime: processingTime
-    };
-    
-    // Save to document store
-    documentStore.addDocument(docMetadata);
-    
-    // Record metrics
-    metrics.recordUpload(true, fileSize, processingTime * 1000);
-    
-    // Return success response with the fileId for future reference
-    res.json({
-      success: true,
-      message: 'PDF processed successfully',
-      fileId: fileId,
-      filename: originalFilename,
-      chunksCount: result.chunksCount,
-      processingTime: `${processingTime.toFixed(2)} seconds`
-    });
-    
-    logger.info(`PDF processing completed in ${processingTime.toFixed(2)}s: ${originalFilename} (${fileId}) - ${result.chunksCount} chunks`);
-  } catch (error) {
-    logger.error('Error in upload route:', error);
-    
-    // Clean up the file if it exists
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-        logger.info(`Cleaned up file after error: ${req.file.path}`);
-      } catch (unlinkError) {
-        logger.error('Error cleaning up file:', unlinkError);
-      }
-    }
-    
-    res.status(500).json({
-      error: 'Failed to process PDF',
-      details: error.message
-    });
-  }
-});
+router.post('/upload', uploadLimiter, upload.single('pdf'), uploadService.handleUpload);
 
 module.exports = router;
