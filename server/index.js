@@ -24,7 +24,6 @@ logger.debug(`PINECONE_API_KEY=${process.env.PINECONE_API_KEY ? '***' + process.
 logger.debug(`PINECONE_ENVIRONMENT=${process.env.PINECONE_ENVIRONMENT || 'not set'}`);
 logger.debug(`MONGODB_URI=${process.env.MONGODB_URI ? '***' + process.env.MONGODB_URI.split('@').pop() : 'not set'}`);
 logger.debug(`MONGODB_DB_NAME=${process.env.MONGODB_DB_NAME || config.mongodb.dbName}`);
-logger.debug(`MONGODB_CHAT_COLLECTION=${process.env.MONGODB_CHAT_COLLECTION || config.mongodb.chatCollection}`);
 
 const app = express();
 const PORT = process.env.PORT || 3000;

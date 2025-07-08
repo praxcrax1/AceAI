@@ -35,6 +35,5 @@ module.exports = {
   mongodb: {
     uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
     dbName: process.env.MONGODB_DB_NAME || 'aceai',
-    chatCollection: process.env.MONGODB_CHAT_COLLECTION || 'chat_memory',
   },
 };
