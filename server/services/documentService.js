@@ -7,6 +7,7 @@ const metrics = require('../utils/metrics');
 const { AppError } = require('../utils/errorHandler');
 const { MongoClient, ObjectId } = require('mongodb');
 const config = require('../config');
+const Document = require('../models/document');
 
 // Service for document management (list, get, delete, update)
 // ...to be implemented: logic will be moved from routes/documents.js
@@ -20,7 +21,7 @@ exports.getAllDocuments = async (req, res) => {
   const documents = db.collection('documents');
   const docs = await documents.find({ userId: new ObjectId(userId) }).toArray();
   await client.close();
-  res.json({ count: docs.length, documents: docs });
+  res.json({ count: docs.length, documents: docs.map(doc => Document.fromDocument(doc)) });
 };
 
 exports.getDocumentById = async (req, res) => {
@@ -34,7 +35,7 @@ exports.getDocumentById = async (req, res) => {
   const doc = await documents.findOne({ _id: id, userId: new ObjectId(userId) });
   await client.close();
   if (!doc) return res.status(404).json({ error: 'Document not found' });
-  res.json(doc);
+  res.json(Document.fromDocument(doc));
 };
 
 exports.deleteDocumentById = async (req, res) => {
@@ -77,5 +78,5 @@ exports.updateDocumentMetadata = async (req, res) => {
   await documents.updateOne({ _id: id, userId: new ObjectId(userId) }, { $set: validUpdates });
   const updatedDoc = await documents.findOne({ _id: id, userId: new ObjectId(userId) });
   await client.close();
-  res.json(updatedDoc);
+  res.json(Document.fromDocument(updatedDoc));
 };

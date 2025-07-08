@@ -4,6 +4,7 @@ const pdfProcessor = require('./pdfProcessor');
 const { MongoClient, ObjectId } = require('mongodb');
 const config = require('../config');
 const { v2: cloudinary } = require('cloudinary');
+const Document = require('../models/document');
 
 // Cloudinary config
 cloudinary.config({
@@ -68,16 +69,17 @@ exports.handleUpload = async (req, res) => {
     const db = client.db(config.mongodb.dbName);
     const documents = db.collection('documents');
 
-    const docMeta = {
+    // When creating docMeta, use the Document model:
+    const docMeta = new Document({
       _id: fileId,
       userId: new ObjectId(userId),
       filename: req.file.originalname,
       cloudinaryUrl: fileUrl,
+      fileId: fileId,
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
-
-    await documents.insertOne(docMeta);
+    });
+    await documents.insertOne(docMeta.toDocument());
 
     // Process PDF: generate embeddings and send to Pinecone
     const processResult = await pdfProcessor.processPDF(fileUrl, `${userId}:${fileId}`, fileId, req.file.originalname);
