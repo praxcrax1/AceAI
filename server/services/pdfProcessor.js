@@ -1,11 +1,10 @@
 // Import Pinecone v6 correctly
 const { Pinecone } = require('@pinecone-database/pinecone');
-const { PDFLoader } = require('@langchain/community/document_loaders/fs/pdf');
+const fetch = require('node-fetch');
+const { WebPDFLoader } = require('@langchain/community/document_loaders/web/pdf');
 const { RecursiveCharacterTextSplitter } = require('langchain/text_splitter');
 const { GoogleGenerativeAIEmbeddings } = require('@langchain/google-genai');
 const { PineconeStore } = require('@langchain/pinecone');
-const fs = require('fs');
-const path = require('path');
 const config = require('../config');
 
 class PDFProcessor {
@@ -44,59 +43,59 @@ class PDFProcessor {
     }
   }
 
-  async processPDF(filePath, fileId) {
-    try {
-      // Initialize Pinecone
-      await this.initPinecone();
+  /**
+   * Process a PDF from a remote URL (Firebase Storage)
+   * @param {string} fileUrl - The remote URL of the PDF
+   * @param {string} namespace - The Pinecone namespace (userId:fileId)
+   * @param {string} fileId - The document's unique ID
+   * @param {string} filename - The original filename
+   */
+  async processPDF(fileUrl, namespace, fileId, filename) {
+  try {
+    await this.initPinecone();
 
-      // Load the PDF
-      console.log(`Loading PDF from ${filePath}`);
-      const loader = new PDFLoader(filePath);
-      const docs = await loader.load();
-      console.log(`Loaded ${docs.length} pages from PDF`);
+    console.log(`Fetching PDF from: ${fileUrl}`);
+    const response = await fetch(fileUrl);
+    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
 
-      // Split the document into chunks
-      const textSplitter = new RecursiveCharacterTextSplitter({
-        chunkSize: config.textSplitter.chunkSize,
-        chunkOverlap: config.textSplitter.chunkOverlap,
-      });
-      const chunks = await textSplitter.splitDocuments(docs);
-      console.log(`Split into ${chunks.length} chunks`);
+    const arrayBuffer = await response.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
 
-      // Add metadata to each chunk to identify which document it came from
-      chunks.forEach((chunk) => {
-        chunk.metadata.fileId = fileId;
-        chunk.metadata.filename = path.basename(filePath);
-      });
+    const loader = new WebPDFLoader(blob); // ✅ pass actual blob
+    const docs = await loader.load();
 
-      // Create and store the embeddings
-      console.log('Creating and storing embeddings in Pinecone...');
-      const vectorStore = await PineconeStore.fromDocuments(
-        chunks,
-        this.embeddings,
-        {
-          pineconeIndex: this.pineconeIndex,
-          namespace: fileId,
-        }
-      );
+    console.log(`Loaded ${docs.length} pages from PDF`);
 
-      console.log('PDF processed and stored in Pinecone successfully');
-      return { 
-        success: true, 
-        chunksCount: chunks.length,
-        pageCount: docs.length
-      };
-    } catch (error) {
-      console.error('Error processing PDF:', error);
-      throw error;
-    } finally {
-      // Clean up the file if necessary
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`Temporary file ${filePath} deleted`);
-      }
-    }
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: config.textSplitter.chunkSize,
+      chunkOverlap: config.textSplitter.chunkOverlap,
+    });
+
+    const chunks = await textSplitter.splitDocuments(docs);
+    console.log(`Split into ${chunks.length} chunks`);
+
+    chunks.forEach((chunk) => {
+      chunk.metadata.fileId = fileId;
+      chunk.metadata.filename = filename;
+    });
+
+    console.log('Creating and storing embeddings in Pinecone...');
+    await PineconeStore.fromDocuments(chunks, this.embeddings, {
+      pineconeIndex: this.pineconeIndex,
+      namespace,
+    });
+
+    console.log('✅ PDF processed and stored in Pinecone');
+    return {
+      success: true,
+      chunksCount: chunks.length,
+      pageCount: docs.length,
+    };
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    throw error;
   }
+}
 }
 
 module.exports = new PDFProcessor();

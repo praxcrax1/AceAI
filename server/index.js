@@ -8,6 +8,7 @@ const uploadRoutes = require('./routes/upload');
 const chatRoutes = require('./routes/chat');
 const adminRoutes = require('./routes/admin');
 const documentsRoutes = require('./routes/documents');
+const userRoutes = require('./routes/user');
 const logger = require('./utils/logger');
 const config = require('./config');
 const setupGracefulShutdown = require('./utils/gracefulShutdown');
@@ -48,6 +49,7 @@ app.use('/api', uploadRoutes);
 app.use('/api', chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/documents', documentsRoutes);
+app.use('/api/user', userRoutes);
 
 // Simple health check route
 app.get('/health', (req, res) => {

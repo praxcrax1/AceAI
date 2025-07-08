@@ -66,6 +66,51 @@
 <body>
     <div class="container py-5">
         <h1 class="mb-4 text-center">AceAI - Chat with your PDFs</h1>
+                <!-- Login Box -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header"><h5 class="m-0">Login</h5></div>
+                    <div class="card-body">
+                        <form id="login-form" class="row g-3">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control" id="login-email" placeholder="Email" required>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="password" class="form-control" id="login-password" placeholder="Password" required>
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="submit" class="btn btn-primary">Login</button>
+                            </div>
+                        </form>
+                        <div id="login-status" class="mt-2 text-danger" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Signup Box -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header"><h5 class="m-0">Sign Up</h5></div>
+                    <div class="card-body">
+                        <form id="signup-form" class="row g-3">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control" id="signup-email" placeholder="Email" required>
+                            </div>
+                            <div class="col-md-5">
+                                <input type="password" class="form-control" id="signup-password" placeholder="Password" required>
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="submit" class="btn btn-success">Sign Up</button>
+                            </div>
+                        </form>
+                        <div id="signup-status" class="mt-2 text-danger" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <div class="row mb-4">
             <div class="col-md-12">
@@ -210,6 +255,77 @@
             }
         });
 
+        // --- LOGIN LOGIC ---
+        const loginForm = document.getElementById('login-form');
+        const loginStatus = document.getElementById('login-status');
+
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginStatus.style.display = 'none';
+            fetch('/api/user/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                    loginStatus.style.display = 'none';
+                    alert('Login successful!');
+                } else {
+                    loginStatus.textContent = data.error || 'Login failed';
+                    loginStatus.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                loginStatus.textContent = 'Login error: ' + err.message;
+                loginStatus.style.display = 'block';
+            });
+        });
+
+        // --- SIGNUP LOGIC ---
+        const signupForm = document.getElementById('signup-form');
+        const signupStatus = document.getElementById('signup-status');
+        signupForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            signupStatus.style.display = 'none';
+            fetch('/api/user/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    localStorage.setItem('token', data.token);
+                    signupStatus.style.display = 'none';
+                    alert('Signup successful! You are now logged in.');
+                } else {
+                    signupStatus.textContent = data.error || 'Signup failed';
+                    signupStatus.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                signupStatus.textContent = 'Signup error: ' + err.message;
+                signupStatus.style.display = 'block';
+            });
+        });
+
+        // --- FETCH WRAPPER TO ADD AUTH TOKEN ---
+        function authFetch(url, options = {}) {
+            const token = localStorage.getItem('token');
+            options.headers = options.headers || {};
+            if (token) {
+                options.headers['Authorization'] = 'Bearer ' + token;
+            }
+            return fetch(url, options);
+        }
+
         // Functions
         function handleFileUpload(file) {
 
@@ -219,25 +335,21 @@
             const formData = new FormData();
             formData.append('pdf', file);
 
-            fetch('/api/upload', {
+            authFetch('/api/upload', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
                 loadingUpload.style.display = 'none';
-                
                 if (data.success) {
                     fileId = data.fileId;
                     uploadSuccess.style.display = 'block';
-                    fileDetails.textContent = `File: ${data.filename} (${data.chunksCount} chunks processed in ${data.processingTime})`;
-                    
-                    // Enable chat
+                    // Show Firebase URL for backend test
+                    fileDetails.innerHTML = `File: ${data.filename || file.name}<br>Firebase URL: <a href="${data.fileUrl}" target="_blank">${data.fileUrl}</a>`;
                     questionInput.disabled = false;
                     sendBtn.disabled = false;
-                    
-                    // Add system message
-                    addMessage(`I've processed "${data.filename}" into ${data.chunksCount} chunks. You can now ask me questions about it!`, 'ai');
+                    addMessage(`I've processed "${data.filename || file.name}". You can now ask me questions about it!`, 'ai');
                 } else {
                     alert('Error processing PDF: ' + (data.error || 'Unknown error'));
                 }
@@ -253,7 +365,7 @@
             questionInput.disabled = true;
             sendBtn.disabled = true;
 
-            fetch('/api/chat', {
+            authFetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -346,7 +458,7 @@
             
             documentsList.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading documents...</p></div>';
             
-            fetch('/api/documents')
+            authFetch('/api/documents')
                 .then(response => response.json())
                 .then(data => {
                     // Save documents to cache
@@ -374,7 +486,7 @@
                             
                             const docDetails = document.createElement('div');
                             docDetails.className = 'small text-muted';
-                            docDetails.innerHTML = `${doc.filename}<br>${doc.pageCount} pages, ${doc.chunkCount} chunks`;
+                            docDetails.innerHTML = `${doc.filename}<br>${doc.pageCount || '?'} pages, ${doc.chunkCount || '?'} chunks` + (doc.firebaseUrl ? `<br>Firebase: <a href="${doc.firebaseUrl}" target="_blank">link</a>` : '');
                             
                             docInfo.appendChild(docTitle);
                             docInfo.appendChild(docDetails);
@@ -386,13 +498,14 @@
                             const chatBtn = document.createElement('button');
                             chatBtn.className = 'btn btn-sm btn-primary me-2';
                             chatBtn.textContent = 'Chat';
-                            chatBtn.addEventListener('click', () => selectDocument(doc.id, doc.filename));
+                            // Use doc._id or doc.fileId for selection
+                            chatBtn.addEventListener('click', () => selectDocument(doc._id || doc.fileId, doc.filename));
                             
                             // Delete button
                             const deleteBtn = document.createElement('button');
                             deleteBtn.className = 'btn btn-sm btn-danger';
                             deleteBtn.textContent = 'Delete';
-                            deleteBtn.addEventListener('click', () => deleteDocument(doc.id, doc.filename));
+                            deleteBtn.addEventListener('click', () => deleteDocument(doc._id || doc.fileId, doc.filename));
                             
                             actionsDiv.appendChild(chatBtn);
                             actionsDiv.appendChild(deleteBtn);
@@ -432,7 +545,7 @@
                 return;
             }
             
-            fetch(`/api/documents/${docId}`, {
+            authFetch(`/api/documents/${docId}`, {
                 method: 'DELETE'
             })
             .then(response => response.json())

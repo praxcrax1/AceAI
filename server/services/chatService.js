@@ -164,10 +164,12 @@ class ChatService {
   }
 
   async processQuestion(question, sessionId, fileId) {
+    const userId = sessionId.split(':')[0]; // Expect sessionId to be userId:sessionId
+    const pineconeNamespace = `${userId}:${fileId}`;
+
     try {
       // Check if namespace exists in Pinecone
-      const vectorStoreKey = `vectorstore:${fileId}`;
-      let vectorStore = cache.get(vectorStoreKey);
+      let vectorStore = cache.get(`vectorstore:${pineconeNamespace}`);
       
       if (!vectorStore) {
         logger.debug(`Vector store not in cache for fileId: ${fileId}, creating new instance`);
@@ -184,12 +186,12 @@ class ChatService {
             this.embeddings,
             {
               pineconeIndex: this.pineconeIndex,
-              namespace: fileId,
+              namespace: pineconeNamespace,
             }
           );
           
           // Cache the vectorStore for future use (15 minutes)
-          cache.set(vectorStoreKey, vectorStore, 900);
+          cache.set(`vectorstore:${pineconeNamespace}`, vectorStore, 900);
         } catch (error) {
           logger.error(`Error retrieving vectors for fileId ${fileId}:`, error);
           throw new AppError(

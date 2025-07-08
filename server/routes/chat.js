@@ -5,12 +5,14 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 const { chatLimiter } = require('../utils/rateLimiter');
+const { authMiddleware } = require('../services/userService');
 
 // Route for handling chat messages
-router.post('/chat', chatLimiter, async (req, res) => {
+router.post('/chat', chatLimiter, authMiddleware, async (req, res) => {
   const startTime = Date.now();
   try {
     const { question, sessionId, fileId } = req.body;
+    const userId = req.user.userId;
 
     // Validate required fields
     if (!question) {
@@ -20,13 +22,13 @@ router.post('/chat', chatLimiter, async (req, res) => {
       return res.status(400).json({ error: 'FileId is required' });
     }
 
-    // If no sessionId is provided, create a new one
-    const chatSessionId = sessionId || uuidv4();
+    // Use userId in session and Pinecone namespace
+    const chatSessionId = sessionId || `${userId}:${uuidv4()}`;
     
     logger.info(`Processing question for session ${chatSessionId} on document ${fileId}: "${question.substring(0, 100)}${question.length > 100 ? '...' : ''}"`);
 
     // Check cache for identical question in same session/document
-    const cacheKey = `chat:${fileId}:${chatSessionId}:${question}`;
+    const cacheKey = `chat:${userId}:${fileId}:${chatSessionId}:${question}`;
     const cachedResponse = cache.get(cacheKey);
     
     let response;

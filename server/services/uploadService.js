@@ -1,84 +1,102 @@
 const multer = require('multer');
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const pdfProcessor = require('./pdfProcessor');
-const logger = require('../utils/logger');
-const metrics = require('../utils/metrics');
-const documentStore = require('../utils/documentStore');
-const fs = require('fs');
+const { MongoClient, ObjectId } = require('mongodb');
+const config = require('../config');
+const { v2: cloudinary } = require('cloudinary');
 
-// Multer config (to be used in route)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Multer config
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed!'), false);
     }
-    cb(null, uploadDir);
   },
-  filename: function (req, file, cb) {
-    const fileId = uuidv4();
-    req.fileId = fileId;
-    cb(null, fileId + path.extname(file.originalname));
-  }
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
-    cb(null, true);
-  } else {
-    cb(new Error('Only PDF files are allowed!'), false);
-  }
-};
-exports.upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
+
+exports.upload = upload;
 
 exports.handleUpload = async (req, res) => {
-  const startTime = Date.now();
+  const client = new MongoClient(config.mongodb.uri);
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No PDF file provided' });
-    }
-    const filePath = req.file.path;
-    const fileId = req.fileId;
-    const originalFilename = req.file.originalname;
-    logger.info(`Processing uploaded PDF: ${originalFilename} (${fileId})`);
-    const result = await pdfProcessor.processPDF(filePath, fileId);
-    const processingTime = (Date.now() - startTime) / 1000;
-    const fileSize = req.file.size;
-    const docMetadata = {
-      id: fileId,
-      filename: originalFilename,
-      title: path.parse(originalFilename).name,
-      filePath: filePath,
-      chunkCount: result.chunksCount,
-      pageCount: result.pageCount || 0,
-      size: fileSize,
-      processingTime: processingTime
-    };
-    documentStore.addDocument(docMetadata);
-    metrics.recordUpload(true, fileSize, processingTime * 1000);
-    res.json({
-      success: true,
-      message: 'PDF processed successfully',
-      fileId: fileId,
-      filename: originalFilename,
-      chunksCount: result.chunksCount,
-      processingTime: `${processingTime.toFixed(2)} seconds`
+    const userId = req.user && req.user.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const fileId = uuidv4();
+    const fileBuffer = req.file.buffer;
+    const fileName = `${userId}/${fileId}.pdf`;
+
+    // Upload PDF buffer to Cloudinary
+    const uploadToCloudinary = () =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'raw',       // for PDFs
+            public_id: fileName,        // must include .pdf
+            format: 'pdf',
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        stream.end(fileBuffer);
+      });
+
+    const uploadResult = await uploadToCloudinary().catch(err => {
+      console.error('❌ Cloudinary upload failed:', err);
+      throw new Error('Failed to upload to Cloudinary');
     });
-    logger.info(`PDF processing completed in ${processingTime.toFixed(2)}s: ${originalFilename} (${fileId}) - ${result.chunksCount} chunks`);
-  } catch (error) {
-    logger.error('Error in upload route:', error);
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-        logger.info(`Cleaned up file after error: ${req.file.path}`);
-      } catch (unlinkError) {
-        logger.error('Error cleaning up file:', unlinkError);
+
+    const fileUrl = uploadResult.secure_url;
+    console.log('✅ Uploaded to Cloudinary:', fileUrl);
+
+    // Store document metadata in MongoDB
+    await client.connect();
+    const db = client.db(config.mongodb.dbName);
+    const documents = db.collection('documents');
+
+    const docMeta = {
+      _id: fileId,
+      userId: new ObjectId(userId),
+      filename: req.file.originalname,
+      cloudinaryUrl: fileUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await documents.insertOne(docMeta);
+
+    // Process PDF: generate embeddings and send to Pinecone
+    const processResult = await pdfProcessor.processPDF(fileUrl, `${userId}:${fileId}`, fileId, req.file.originalname);
+
+    // Update MongoDB document with Pinecone/document stats
+    await documents.updateOne(
+      { _id: fileId },
+      { $set: {
+          pageCount: processResult.pageCount,
+          processedAt: new Date(),
+        }
       }
-    }
-    res.status(500).json({ error: 'Failed to process PDF', details: error.message });
+    );
+
+    res.json({ success: true, fileId, fileUrl });
+  } catch (err) {
+    console.error('❌ Upload handler error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    await client.close();
   }
 };
