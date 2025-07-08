@@ -28,7 +28,7 @@ module.exports = {
   
   // Vector search configuration
   vectorSearch: {
-    topK: 5,
+    topK: 1,
   },
   
   // MongoDB configuration

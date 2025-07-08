@@ -4,12 +4,12 @@ const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { PineconeStore } = require('@langchain/pinecone');
 const { BufferMemory } = require('langchain/memory');
 const { MongoDBChatMessageHistory } = require('@langchain/mongodb');
-const { ConversationalRetrievalQAChain } = require('langchain/chains');
 const config = require('../config');
 const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 const { AppError } = require('../utils/errorHandler');
 const mongoDBClient = require('../utils/mongodb');
+const { ChatPromptTemplate, MessagesPlaceholder } = require("@langchain/core/prompts");
 
 class ChatService {
   constructor() {
@@ -88,23 +88,14 @@ class ChatService {
 
   async getOrCreateMemory(sessionId) {
     try {
-      // Ensure MongoDB is initialized
       await this.initMongoDB();
-      
       if (!this.sessionMemory.has(sessionId)) {
-        logger.debug(`Creating new MongoDB chat history for session: ${sessionId}`);
-        
-        // Get MongoDB database and collection references
         const db = await mongoDBClient.getDB();
         const collection = db.collection(config.mongodb.chatCollection);
-        
-        // Create MongoDB chat message history with collection object
         const messageHistory = new MongoDBChatMessageHistory({
-          collection, // Pass the actual collection object instead of the name
+          collection,
           sessionId: sessionId,
         });
-
-        // Create memory with MongoDB backing
         const memory = new BufferMemory({
           chatHistory: messageHistory,
           memoryKey: 'chat_history',
@@ -112,24 +103,16 @@ class ChatService {
           inputKey: 'question',
           outputKey: 'text',
         });
-        
         this.sessionMemory.set(sessionId, memory);
-        logger.debug(`MongoDB chat history created for session: ${sessionId}`);
       }
-      
       return this.sessionMemory.get(sessionId);
     } catch (error) {
-      logger.error(`Error creating MongoDB chat memory for session ${sessionId}:`, error);
-      
-      // Fallback to in-memory storage if MongoDB fails
-      logger.warn(`Falling back to in-memory chat history for session: ${sessionId}`);
       const fallbackMemory = new BufferMemory({
         memoryKey: 'chat_history',
         returnMessages: true,
         inputKey: 'question',
         outputKey: 'text',
       });
-      
       this.sessionMemory.set(sessionId, fallbackMemory);
       return fallbackMemory;
     }
@@ -164,23 +147,13 @@ class ChatService {
   }
 
   async processQuestion(question, sessionId, fileId) {
-    const userId = sessionId.split(':')[0]; // Expect sessionId to be userId:sessionId
+    const userId = sessionId.split(':')[0];
     const pineconeNamespace = `${userId}:${fileId}`;
-
     try {
-      // Check if namespace exists in Pinecone
       let vectorStore = cache.get(`vectorstore:${pineconeNamespace}`);
-      
       if (!vectorStore) {
-        logger.debug(`Vector store not in cache for fileId: ${fileId}, creating new instance`);
-        
-        // Initialize Pinecone
         await this.initPinecone();
-        
-        // Make sure MongoDB is initialized for chat history
         await this.initMongoDB();
-
-        // Create a vector store for the specific document namespace
         try {
           vectorStore = await PineconeStore.fromExistingIndex(
             this.embeddings,
@@ -189,11 +162,8 @@ class ChatService {
               namespace: pineconeNamespace,
             }
           );
-          
-          // Cache the vectorStore for future use (15 minutes)
           cache.set(`vectorstore:${pineconeNamespace}`, vectorStore, 900);
         } catch (error) {
-          logger.error(`Error retrieving vectors for fileId ${fileId}:`, error);
           throw new AppError(
             `No document found with ID: ${fileId}. Please upload a document first.`,
             404,
@@ -201,46 +171,41 @@ class ChatService {
           );
         }
       }
-
-      // Create a retriever
       const retriever = vectorStore.asRetriever({
         searchType: 'similarity',
-        searchKwargs: { k: config.vectorSearch.topK }, // Retrieve top K most similar chunks
+        searchKwargs: { k: config.vectorSearch.topK },
       });
-
-      // Get or create memory for this session (now async)
       const memory = await this.getOrCreateMemory(sessionId);
-
-      // Create a conversational chain
-      const chain = ConversationalRetrievalQAChain.fromLLM(
-        this.llm,
-        retriever,
-        {
-          memory: memory,
-          returnSourceDocuments: true,
-          questionGeneratorChainOptions: {
-            llm: this.llm,
-          },
-        }
-      );
-
-      // Process the question
-      const response = await chain.call({
-        question,
-      });
-
-      // Extract sources from the response
-      const sources = response.sourceDocuments.map(doc => ({
+      let chatHistoryMessages = [];
+      if (memory && typeof memory.chatHistory?.getMessages === 'function') {
+        chatHistoryMessages = await memory.chatHistory.getMessages();
+      }
+      const relevantDocs = await retriever.getRelevantDocuments(question);
+      const context = relevantDocs.map(doc => doc.pageContent).join("\n---\n");
+      const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are a helpful assistant for answering questions about a document. Use the provided context to answer. If you don't know, say so."],
+        new MessagesPlaceholder("history"),
+        ["user", "Context:\n{context}\n\nQuestion: {question}"]
+      ]);
+      const promptInput = {
+        history: chatHistoryMessages,
+        context,
+        question
+      };
+      const messages = await prompt.formatMessages(promptInput);
+      const response = await this.llm.invoke(messages);
+      if (memory && typeof memory.saveContext === 'function') {
+        await memory.saveContext({ question }, { text: response.content });
+      }
+      const sources = relevantDocs.map(doc => ({
         content: doc.pageContent,
         metadata: doc.metadata,
       }));
-
       return {
-        answer: response.text,
-        sources: sources.slice(0, 3), // Return the top 3 sources for reference
+        answer: response.content,
+        sources: sources.slice(0, 3),
       };
     } catch (error) {
-      console.error('Error processing question:', error);
       throw error;
     }
   }
