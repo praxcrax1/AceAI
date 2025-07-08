@@ -9,5 +9,27 @@
     "size": 33171,
     "processingTime": 4.359,
     "updatedAt": "2025-07-06T18:21:07.186Z"
+  },
+  {
+    "id": "7dbd5850-3514-4bdb-bde9-5d0929de423f",
+    "filename": "CNP - RIP_OSPF_ BGP_2025.pdf",
+    "title": "CNP - RIP_OSPF_ BGP_2025",
+    "filePath": "/home/prakhar/Repos/AceAI/server/uploads/7dbd5850-3514-4bdb-bde9-5d0929de423f.pdf",
+    "chunkCount": 150,
+    "pageCount": 150,
+    "size": 4534049,
+    "processingTime": 17.229,
+    "updatedAt": "2025-07-06T20:40:30.311Z"
+  },
+  {
+    "id": "1b57b476-d73a-4826-aab4-fba3cb012fb5",
+    "filename": "test.pdf",
+    "title": "test",
+    "filePath": "/home/prakhar/Repos/AceAI/server/uploads/1b57b476-d73a-4826-aab4-fba3cb012fb5.pdf",
+    "chunkCount": 230,
+    "pageCount": 110,
+    "size": 4645325,
+    "processingTime": 12.099,
+    "updatedAt": "2025-07-08T16:02:51.191Z"
   }
 ]
