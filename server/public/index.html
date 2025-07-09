@@ -120,19 +120,48 @@
                         <button id="show-documents-btn" class="btn btn-sm btn-outline-primary">View Documents</button>
                     </div>
                     <div class="card-body">
-                        <div id="upload-area" class="upload-area">
-                            <p class="mb-1">Drop your PDF here or click to browse</p>
-                            <p class="text-muted small">Max size: 10MB</p>
-                            <input type="file" id="file-input" accept=".pdf" class="d-none">
+                        <ul class="nav nav-tabs mb-3" id="uploadTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-upload" type="button" role="tab">File Upload</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="link-tab" data-bs-toggle="tab" data-bs-target="#link-upload" type="button" role="tab">PDF Link</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content" id="uploadTabContent">
+                            <div class="tab-pane fade show active" id="file-upload" role="tabpanel">
+                                <div id="upload-area" class="upload-area">
+                                    <p class="mb-1">Drop your PDF here or click to browse</p>
+                                    <p class="text-muted small">Max size: 10MB</p>
+                                    <input type="file" id="file-input" accept=".pdf" class="d-none">
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="link-upload" role="tabpanel">
+                                <form id="link-upload-form" class="mt-3">
+                                    <div class="input-group">
+                                        <input type="url" class="form-control" id="pdf-link-input" placeholder="Paste PDF link here..." required>
+                                        <button type="submit" class="btn btn-primary">Upload</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="tab-pane fade" id="text-upload" role="tabpanel">
+                                <form id="text-upload-form" class="mt-3">
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control mb-2" id="text-filename-input" placeholder="Optional filename (e.g. notes.pdf)">
+                                        <textarea class="form-control" id="text-content-input" rows="5" placeholder="Paste or type your text here..." required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Upload</button>
+                                </form>
+                            </div>
                         </div>
                         <div id="loading-upload" class="loading-indicator text-center mt-3">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-2">Processing PDF. This may take a few moments...</p>
+                            <p class="mt-2">Processing. This may take a few moments...</p>
                         </div>
                         <div id="upload-success" class="upload-success">
-                            <p><i class="bi bi-check-circle"></i> PDF uploaded and processed successfully!</p>
+                            <p><i class="bi bi-check-circle"></i> Uploaded and processed successfully!</p>
                             <p id="file-details"></p>
                         </div>
                     </div>
@@ -335,7 +364,7 @@
             const formData = new FormData();
             formData.append('pdf', file);
 
-            authFetch('/api/upload', {
+            authFetch('/api/upload/file', {
                 method: 'POST',
                 body: formData
             })
@@ -359,6 +388,69 @@
                 alert('Error uploading file: ' + error.message);
             });
         }
+
+        // --- PDF LINK UPLOAD ---
+        document.getElementById('link-upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            loadingUpload.style.display = 'block';
+            uploadSuccess.style.display = 'none';
+            const pdfLink = document.getElementById('pdf-link-input').value;
+            authFetch('/api/upload/link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: pdfLink })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingUpload.style.display = 'none';
+                if (data.success) {
+                    fileId = data.fileId;
+                    uploadSuccess.style.display = 'block';
+                    fileDetails.innerHTML = `PDF Link: <a href="${data.fileUrl}" target="_blank">${data.fileUrl}</a>`;
+                    questionInput.disabled = false;
+                    sendBtn.disabled = false;
+                    addMessage(`I've processed your PDF link. You can now ask me questions about it!`, 'ai');
+                } else {
+                    alert('Error processing PDF link: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                loadingUpload.style.display = 'none';
+                alert('Error uploading PDF link: ' + error.message);
+            });
+        });
+
+        // --- TEXT UPLOAD ---
+        document.getElementById('text-upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            loadingUpload.style.display = 'block';
+            uploadSuccess.style.display = 'none';
+            const text = document.getElementById('text-content-input').value;
+            const filename = document.getElementById('text-filename-input').value;
+            authFetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, filename })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingUpload.style.display = 'none';
+                if (data.success) {
+                    fileId = data.fileId;
+                    uploadSuccess.style.display = 'block';
+                    fileDetails.innerHTML = `Text as PDF: <a href="${data.fileUrl}" target="_blank">${data.fileUrl}</a>`;
+                    questionInput.disabled = false;
+                    sendBtn.disabled = false;
+                    addMessage(`I've processed your text as a PDF. You can now ask me questions about it!`, 'ai');
+                } else {
+                    alert('Error processing text: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                loadingUpload.style.display = 'none';
+                alert('Error uploading text: ' + error.message);
+            });
+        });
 
         function askQuestion(question) {
             loadingAnswer.style.display = 'block';
@@ -594,6 +686,72 @@
                 console.error('Error showing documents modal:', error);
                 alert('Failed to show documents: ' + error.message);
             }
+        });
+
+        // --- PDF FILE UPLOAD TEST ---
+        document.getElementById('upload-file-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('pdf-file-input');
+            const resultDiv = document.getElementById('file-upload-result');
+            resultDiv.textContent = '';
+            if (!fileInput.files.length) {
+                resultDiv.textContent = 'Please select a PDF file.';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('pdf', fileInput.files[0]);
+            fetch('/api/upload/file', {
+                method: 'POST',
+                headers: {
+                    'Authorization': localStorage.getItem('token') ? 'Bearer ' + localStorage.getItem('token') : ''
+                },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `<span class='text-success'>Success!</span><br>File ID: <b>${data.fileId}</b><br>File URL: <a href="${data.fileUrl}" target="_blank">${data.fileUrl}</a>`;
+                } else {
+                    resultDiv.innerHTML = `<span class='text-danger'>Error:</span> ${data.error || 'Unknown error'}`;
+                }
+            })
+            .catch(err => {
+                resultDiv.innerHTML = `<span class='text-danger'>Error:</span> ${err.message}`;
+            });
+        });
+
+        // --- PDF LINK UPLOAD TEST ---
+        document.getElementById('upload-link-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const urlInput = document.getElementById('pdf-link-input');
+            const filenameInput = document.getElementById('pdf-link-filename');
+            const resultDiv = document.getElementById('link-upload-result');
+            resultDiv.textContent = '';
+            const url = urlInput.value.trim();
+            const filename = filenameInput.value.trim();
+            if (!url) {
+                resultDiv.textContent = 'Please enter a PDF URL.';
+                return;
+            }
+            fetch('/api/upload/link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': localStorage.getItem('token') ? 'Bearer ' + localStorage.getItem('token') : ''
+                },
+                body: JSON.stringify({ url, filename })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `<span class='text-success'>Success!</span><br>File ID: <b>${data.fileId}</b><br>File URL: <a href="${data.fileUrl}" target="_blank">${data.fileUrl}</a>`;
+                } else {
+                    resultDiv.innerHTML = `<span class='text-danger'>Error:</span> ${data.error || 'Unknown error'}`;
+                }
+            })
+            .catch(err => {
+                resultDiv.innerHTML = `<span class='text-danger'>Error:</span> ${err.message}`;
+            });
         });
     </script>
 </body>

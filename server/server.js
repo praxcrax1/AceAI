@@ -12,10 +12,10 @@ require('dotenv').config({ override: true });
 const requiredEnvVars = [
   'GOOGLE_API_KEY',
   'PINECONE_API_KEY',
-  'PINECONE_ENVIRONMENT',
   'PINECONE_INDEX_NAME',
   'MONGODB_URI',
   'MONGODB_DB_NAME',
+  'MONGODB_CHAT_COLLECTION',
   'JWT_SECRET',
   'CLOUDINARY_CLOUD_NAME',
   'CLOUDINARY_API_KEY',
@@ -37,10 +37,10 @@ if (missingEnvVars.length > 0) {
 console.log('Environment variables loaded successfully:');
 console.log(`- GOOGLE_API_KEY: ${process.env.GOOGLE_API_KEY ? 'is set' : 'is NOT set'}`);
 console.log(`- PINECONE_API_KEY: ${process.env.PINECONE_API_KEY ? 'is set' : 'is NOT set'}`);
-console.log(`- PINECONE_ENVIRONMENT: ${process.env.PINECONE_ENVIRONMENT ? 'is set' : 'is NOT set'}`);
 console.log(`- PINECONE_INDEX_NAME: ${process.env.PINECONE_INDEX_NAME ? 'is set' : 'is NOT set'}`);
 console.log(`- MONGODB_URI: ${process.env.MONGODB_URI ? 'is set' : 'is NOT set'}`);
 console.log(`- MONGODB_DB_NAME: ${process.env.MONGODB_DB_NAME || 'not set (using default)'}`);
+console.log(`- MONGODB_CHAT_COLLECTION: ${process.env.MONGODB_CHAT_COLLECTION || 'not set (using default)'}`);
 console.log(`- JWT_SECRET: ${process.env.JWT_SECRET ? 'is set' : 'is NOT set'}`);
 console.log(`- CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME ? 'is set' : 'is NOT set'}`);
 console.log(`- CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY ? 'is set' : 'is NOT set'}`);

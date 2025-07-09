@@ -40,6 +40,32 @@ This document describes all public API endpoints for the AceAI PDF RAG applicati
   - `fileUrl` (string)
   - (on error) `error` (string)
 
+### POST /api/upload/file
+- **Description:** Upload a local PDF file for processing and embedding.
+- **Headers:**
+  - `Authorization: Bearer <token>`
+- **Request:**
+  - `multipart/form-data` with a `pdf` file field (PDF only, max 10MB)
+- **Response:**
+  - `success` (boolean)
+  - `fileId` (string)
+  - `fileUrl` (string)
+  - (on error) `error` (string)
+
+### POST /api/upload/link
+- **Description:** Upload a PDF by providing a direct URL to the PDF file. The server will fetch, process, and embed the PDF from the provided link.
+- **Headers:**
+  - `Authorization: Bearer <token>`
+  - `Content-Type: application/json`
+- **Request Body:**
+  - `url` (string, required): Direct link to the PDF file
+  - `filename` (string, optional): Custom filename for the document
+- **Response:**
+  - `success` (boolean)
+  - `fileId` (string)
+  - `fileUrl` (string) – The original PDF URL
+  - (on error) `error` (string)
+
 ---
 
 ## Document Management
