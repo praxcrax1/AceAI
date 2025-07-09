@@ -10,10 +10,9 @@ interface DocumentReaderProps {
   isOpen: boolean
   onClose: () => void
   page?: number | null
-  lines?: { from: number; to: number } | null
 }
 
-export function DocumentReader({ document: doc, isOpen, onClose, page, lines }: DocumentReaderProps) {
+export function DocumentReader({ document: doc, isOpen, onClose, page }: DocumentReaderProps) {
   // Handle escape key to close reader
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -32,8 +31,8 @@ export function DocumentReader({ document: doc, isOpen, onClose, page, lines }: 
     return null
   }
 
-  // Optionally, you can use page/lines to control the iframe src or overlay highlights
-  // For now, pass page/lines as query params if the PDF viewer supports it
+  // Optionally, you can use page to control the iframe src or overlay highlights
+  // For now, pass page as query params if the PDF viewer supports it
   const getIframeSrc = () => {
     if (!doc) return ""
     let url = doc.cloudinaryUrl

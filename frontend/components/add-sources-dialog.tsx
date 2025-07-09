@@ -3,13 +3,13 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Upload, X, Search } from "lucide-react"
+import { Upload } from "lucide-react"
 import type { Document } from "@/types"
 
 interface AddSourcesDialogProps {
@@ -54,17 +54,22 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
 
       if (data.success) {
         const document: Document = {
-          fileId: data.fileId,
+          _id: data._id || "",
+          userId: data.userId || "",
           filename: file.name,
-          title: file.name.replace(".pdf", ""),
-          fileUrl: data.fileUrl,
-          uploadedAt: new Date().toISOString(),
+          cloudinaryUrl: data.fileUrl || "",
+          fileId: data.fileId,
+          pageCount: data.pageCount || 0,
+          chunksCount: data.chunksCount || 0,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          processedAt: data.processedAt || new Date().toISOString(),
         }
         onDocumentUpload(document)
       } else {
         setError(data.error || "Upload failed")
       }
-    } catch (error) {
+    } catch {
       setError("Upload failed. Please try again.")
     } finally {
       setUploading(false)
@@ -94,18 +99,23 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
 
       if (data.success) {
         const document: Document = {
-          fileId: data.fileId,
+          _id: data._id || "",
+          userId: data.userId || "",
           filename: linkUrl.split("/").pop() || "Document",
-          title: linkUrl.split("/").pop()?.replace(".pdf", "") || "Document",
-          fileUrl: data.fileUrl,
-          uploadedAt: new Date().toISOString(),
+          cloudinaryUrl: data.fileUrl || "",
+          fileId: data.fileId,
+          pageCount: data.pageCount || 0,
+          chunksCount: data.chunksCount || 0,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          processedAt: data.processedAt || new Date().toISOString(),
         }
         onDocumentUpload(document)
         setLinkUrl("")
       } else {
         setError(data.error || "Upload failed")
       }
-    } catch (error) {
+    } catch {
       setError("Upload failed. Please try again.")
     } finally {
       setUploading(false)

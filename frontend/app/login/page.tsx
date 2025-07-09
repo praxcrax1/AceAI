@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,8 +28,9 @@ export default function LoginPage() {
     try {
       await login(email, password)
       window.location.href = "/dashboard"
-    } catch (err: any) {
-      setError(err.message || "Login failed")
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      setError(errorMsg || "Login failed")
     } finally {
       setLoading(false)
     }
@@ -178,7 +177,7 @@ export default function LoginPage() {
 
                 <div className="text-center pt-4 border-t">
                   <p className="text-sm text-muted-foreground">
-                    Don't have an account?{" "}
+                    Don&apos;t have an account?{" "}
                     <Link href="/register" className="font-medium text-primary hover:text-primary/80 transition-colors">
                       Sign up for free
                     </Link>

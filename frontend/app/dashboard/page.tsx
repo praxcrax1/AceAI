@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Brain, Plus, LogOut } from "lucide-react"
-import type { Document } from "@/types"
+import type { Document, ChatMessage } from "@/types"
 import { DocumentReader } from "@/components/document-reader"
 
 export default function DashboardPage() {
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [showAddSources, setShowAddSources] = useState(false)
-  const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [readerOpen, setReaderOpen] = useState(false)
   const [readerDocument, setReaderDocument] = useState<Document | null>(null)
 

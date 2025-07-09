@@ -164,7 +164,7 @@ export function Sidebar({
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Document</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete "{document.filename}"? This action cannot be undone and will
+                            Are you sure you want to delete &quot;{document.filename}&quot;? This action cannot be undone and will
                             remove all associated chat history.
                           </AlertDialogDescription>
                         </AlertDialogHeader>

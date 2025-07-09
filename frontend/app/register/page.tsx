@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +21,6 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const { register } = useAuth()
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,8 +41,9 @@ export default function RegisterPage() {
     try {
       await register(email, password)
       window.location.href = "/dashboard"
-    } catch (err: any) {
-      setError(err.message || "Registration failed")
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      setError(errorMsg || "Registration failed")
     } finally {
       setLoading(false)
     }

@@ -22,7 +22,6 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
   const [loading, setLoading] = useState(false)
   const [readerOpen, setReaderOpen] = useState(false)
   const [readerPage, setReaderPage] = useState<number | null>(null)
-  const [readerLines, setReaderLines] = useState<{ from: number; to: number } | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const suggestedQuestions = ["Summarize the main points", "What are the key findings?", "Explain the methodology"]
@@ -95,13 +94,11 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
     navigator.clipboard.writeText(text)
   }
 
-  const handleViewSource = (source: any) => {
+  // Define a Source type for ChatMessage['sources']
+  type Source = NonNullable<ChatMessage["sources"]>[number]
+
+  const handleViewSource = (source: Source) => {
     setReaderPage(source.metadata?.["loc.pageNumber"] || null)
-    setReaderLines(
-      source.metadata?.["loc.lines.from"] && source.metadata?.["loc.lines.to"]
-        ? { from: source.metadata["loc.lines.from"], to: source.metadata["loc.lines.to"] }
-        : null
-    )
     setReaderOpen(true)
   }
 
@@ -116,7 +113,7 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
           <div className="space-y-4 p-4">
             {messages.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">Start a conversation about "{document.filename}"</p>
+                <p className="text-muted-foreground mb-4">Start a conversation about &quot;{document.filename}&quot;</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {suggestedQuestions.map((question, index) => (
                     <Button key={index} variant="outline" size="sm" onClick={() => handleSuggestedQuestion(question)}>
@@ -260,7 +257,6 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
         isOpen={readerOpen}
         onClose={() => setReaderOpen(false)}
         page={readerPage}
-        lines={readerLines}
       />
     </div>
   )
