@@ -16,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, FileText, Trash2, Calendar, FileIcon } from "lucide-react"
+import { Plus, Search, FileText, Trash2, Calendar, FileIcon, Eye } from "lucide-react"
 import type { Document } from "@/types"
 
 interface SidebarProps {
@@ -25,6 +25,7 @@ interface SidebarProps {
   onDocumentSelect: (document: Document) => void
   onDocumentDelete: (documentId: string) => void
   onAddSources: () => void
+  onViewDocument: (document: Document) => void // NEW
 }
 
 export function Sidebar({
@@ -33,6 +34,7 @@ export function Sidebar({
   onDocumentSelect,
   onDocumentDelete,
   onAddSources,
+  onViewDocument, // NEW
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -134,36 +136,50 @@ export function Sidebar({
                       {smartTruncateFilename(document.filename)}
                     </p>
                   </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 flex-shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Document</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete "{document.filename}"? This action cannot be undone and will
-                          remove all associated chat history.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => onDocumentDelete(document.fileId)}
-                          className="bg-red-600 hover:bg-red-700"
+                  <div className="flex gap-1 items-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 hover:bg-muted-foreground/10 flex-shrink-0"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onViewDocument(document);
+                      }}
+                      title="View document"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete "{document.filename}"? This action cannot be undone and will
+                            remove all associated chat history.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => onDocumentDelete(document.fileId)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">

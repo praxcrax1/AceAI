@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Brain, Plus, LogOut } from "lucide-react"
 import type { Document } from "@/types"
+import { DocumentReader } from "@/components/document-reader"
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth()
@@ -29,6 +30,8 @@ export default function DashboardPage() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [showAddSources, setShowAddSources] = useState(false)
   const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [readerOpen, setReaderOpen] = useState(false)
+  const [readerDocument, setReaderDocument] = useState<Document | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -95,6 +98,16 @@ export default function DashboardPage() {
   const handleLogout = () => {
     logout()
     router.push("/login")
+  }
+
+  const handleViewDocument = (document: Document) => {
+    setReaderDocument(document)
+    setReaderOpen(true)
+  }
+
+  const handleCloseReader = () => {
+    setReaderOpen(false)
+    setReaderDocument(null)
   }
 
   if (loading) {
@@ -164,6 +177,7 @@ export default function DashboardPage() {
           onDocumentSelect={handleDocumentSelect}
           onDocumentDelete={handleDocumentDelete}
           onAddSources={() => setShowAddSources(true)}
+          onViewDocument={handleViewDocument}
         />
 
         {/* Main Content */}
@@ -190,6 +204,12 @@ export default function DashboardPage() {
         open={showAddSources}
         onOpenChange={setShowAddSources}
         onDocumentUpload={handleDocumentUpload}
+      />
+
+      <DocumentReader
+        document={readerDocument}
+        isOpen={readerOpen}
+        onClose={handleCloseReader}
       />
     </div>
   )
