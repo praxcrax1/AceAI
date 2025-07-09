@@ -1,11 +1,14 @@
 export interface Document {
-  fileId: string
+  _id: string
+  userId: string
   filename: string
-  title?: string
-  description?: string
-  tags?: string[]
-  fileUrl: string
-  uploadedAt: string
+  cloudinaryUrl: string
+  fileId: string
+  pageCount: number
+  chunksCount: number | null
+  createdAt: string
+  updatedAt: string
+  processedAt: string
 }
 
 export interface ChatMessage {
@@ -13,7 +16,20 @@ export interface ChatMessage {
   content: string
   role: "user" | "assistant"
   timestamp: Date
-  sources?: any[]
+  sources?: {
+    content: string
+    metadata: {
+      fileId: string
+      filename: string
+      "loc.lines.from": number
+      "loc.lines.to": number
+      "loc.pageNumber": number
+      [key: string]: any
+    }
+  }[]
+  sessionId?: string
+  processingTime?: string
+  cached?: boolean
 }
 
 export interface User {

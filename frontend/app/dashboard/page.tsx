@@ -5,10 +5,10 @@ import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { ChatArea } from "@/components/chat-area"
-import { StudioPanel } from "@/components/studio-panel"
 import { AddSourcesDialog } from "@/components/add-sources-dialog"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { Brain, Settings, Share, Plus } from "lucide-react"
+import { Brain, Plus } from "lucide-react"
 import type { Document } from "@/types"
 
 export default function DashboardPage() {
@@ -57,6 +57,30 @@ export default function DashboardPage() {
     setShowAddSources(false)
   }
 
+  const handleDocumentDelete = async (documentId: string) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/documents/${documentId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      )
+
+      if (response.ok) {
+        setDocuments((prev) => prev.filter((doc) => doc.fileId !== documentId))
+        if (selectedDocument?.fileId === documentId) {
+          setSelectedDocument(null)
+          setChatMessages([])
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete document:", error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -76,18 +100,19 @@ export default function DashboardPage() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <Brain className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">{selectedDocument ? selectedDocument.title : "AceAI"}</h1>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-xl font-semibold">AceAI</h1>
+              {selectedDocument && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-lg text-muted-foreground truncate max-w-md">{selectedDocument.filename}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Share className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
+          <ThemeToggle />
           <Button variant="outline" size="sm" onClick={logout}>
             Logout
           </Button>
@@ -100,32 +125,28 @@ export default function DashboardPage() {
           documents={documents}
           selectedDocument={selectedDocument}
           onDocumentSelect={handleDocumentSelect}
+          onDocumentDelete={handleDocumentDelete}
           onAddSources={() => setShowAddSources(true)}
         />
 
         {/* Main Content */}
-        <div className="flex-1 flex">
-          {selectedDocument ? (
-            <>
-              <ChatArea document={selectedDocument} messages={chatMessages} onMessagesChange={setChatMessages} />
-              <StudioPanel document={selectedDocument} />
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-4">
-                <Brain className="h-16 w-16 text-muted-foreground mx-auto" />
-                <h2 className="text-2xl font-semibold text-muted-foreground">Welcome to AceAI</h2>
-                <p className="text-muted-foreground max-w-md">
-                  Upload your first document to start chatting with your PDFs using AI
-                </p>
-                <Button onClick={() => setShowAddSources(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Sources
-                </Button>
-              </div>
+        {selectedDocument ? (
+          <ChatArea document={selectedDocument} messages={chatMessages} onMessagesChange={setChatMessages} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <Brain className="h-16 w-16 text-muted-foreground mx-auto" />
+              <h2 className="text-2xl font-semibold text-muted-foreground">Welcome to AceAI</h2>
+              <p className="text-muted-foreground max-w-md">
+                Upload your first document to start chatting with your PDFs using AI
+              </p>
+              <Button onClick={() => setShowAddSources(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Sources
+              </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <AddSourcesDialog

@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Upload, Link, FileText, X, Search, FileIcon, Presentation, Globe, Youtube, Copy } from "lucide-react"
+import { Upload, X, Search } from "lucide-react"
 import type { Document } from "@/types"
 
 interface AddSourcesDialogProps {
@@ -127,30 +126,9 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                <span className="text-xs text-primary-foreground font-bold">AI</span>
-              </div>
-              <DialogTitle>AceAI</DialogTitle>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </DialogHeader>
-
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogTitle>Add Source</DialogTitle>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Add sources</h2>
-            <Button variant="outline" size="sm">
-              <Search className="h-4 w-4 mr-2" />
-              Discover sources
-            </Button>
-          </div>
-
           <p className="text-muted-foreground">
             Sources let AceAI base its responses on the information that matters most to you.
             <br />
@@ -184,9 +162,7 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
                     upload
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Supported file types: PDF, txt, Markdown, Audio (e.g. mp3)
-                </p>
+                <p className="text-sm text-muted-foreground">Supported file types: PDF (max 10MB)</p>
               </div>
 
               <input
@@ -220,67 +196,6 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
               </div>
             </TabsContent>
           </Tabs>
-
-          {/* Source Options */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">G</span>
-                </div>
-                <span className="font-medium">Google Drive</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <Link className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Link</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Paste text</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <FileIcon className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Google Docs</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <Presentation className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Google Slides</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <Globe className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Website</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <Youtube className="h-5 w-5 text-red-500" />
-                <span className="font-medium">YouTube</span>
-              </CardContent>
-            </Card>
-
-            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-              <CardContent className="p-4 flex items-center space-x-3">
-                <Copy className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Copied text</span>
-              </CardContent>
-            </Card>
-          </div>
 
           {uploading && (
             <div className="flex items-center justify-center py-4">

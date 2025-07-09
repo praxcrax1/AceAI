@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
-import { Send, Copy, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Send, Copy, ThumbsUp, ThumbsDown, ChevronDown, FileText } from "lucide-react"
 import type { Document, ChatMessage } from "@/types"
 
 interface ChatAreaProps {
@@ -23,7 +25,10 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+      const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]")
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
     }
   }, [messages])
 
@@ -64,6 +69,9 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
           role: "assistant",
           timestamp: new Date(),
           sources: data.sources,
+          sessionId: data.sessionId,
+          processingTime: data.processingTime,
+          cached: data.cached,
         }
 
         onMessagesChange([...newMessages, assistantMessage])
@@ -79,75 +87,126 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
     setInput(question)
   }
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+  }
+
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="border-b p-4 flex items-center justify-between">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="border-b p-4 flex-shrink-0">
         <h2 className="font-semibold">Chat</h2>
-        <Button variant="ghost" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
       </div>
 
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        <div className="space-y-4 max-w-4xl">
-          {messages.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">
-                Start a conversation about "{document.title || document.filename}"
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {suggestedQuestions.map((question, index) => (
-                  <Button key={index} variant="outline" size="sm" onClick={() => handleSuggestedQuestion(question)}>
-                    {question}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {messages.map((message) => (
-            <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-              <Card
-                className={`max-w-[80%] p-4 ${message.role === "user" ? "bg-primary text-primary-foreground" : ""}`}
-              >
-                <div className="prose prose-sm max-w-none">{message.content}</div>
-                {message.role === "assistant" && (
-                  <div className="flex items-center space-x-2 mt-3 pt-3 border-t">
-                    <Button variant="ghost" size="sm">
-                      <Copy className="h-4 w-4" />
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full" ref={scrollAreaRef}>
+          <div className="space-y-4 p-4">
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">Start a conversation about "{document.filename}"</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {suggestedQuestions.map((question, index) => (
+                    <Button key={index} variant="outline" size="sm" onClick={() => handleSuggestedQuestion(question)}>
+                      {question}
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <ThumbsUp className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <ThumbsDown className="h-4 w-4" />
-                    </Button>
-                    {message.sources && (
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {message.sources.length} source{message.sources.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </Card>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex justify-start">
-              <Card className="max-w-[80%] p-4">
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  <span className="text-sm text-muted-foreground">Thinking...</span>
+                  ))}
                 </div>
-              </Card>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+              </div>
+            )}
 
-      <div className="border-t p-4">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                <Card
+                  className={`max-w-[80%] p-4 ${message.role === "user" ? "bg-primary text-primary-foreground" : ""}`}
+                >
+                  <div className="prose prose-sm max-w-none whitespace-pre-wrap">{message.content}</div>
+
+                  {message.role === "assistant" && (
+                    <>
+                      {/* Sources Section */}
+                      {message.sources && message.sources.length > 0 && (
+                        <Collapsible className="mt-4">
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-full justify-between p-2">
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm">
+                                  {message.sources.length} source{message.sources.length !== 1 ? "s" : ""}
+                                </span>
+                              </div>
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-2 mt-2">
+                            <div className="max-h-60 overflow-y-auto space-y-2">
+                              {message.sources.map((source, index) => (
+                                <div key={index} className="border rounded-lg p-3 bg-muted/50">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <Badge variant="secondary" className="text-xs">
+                                        Page {source.metadata?.["loc.pageNumber"] || "N/A"}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">
+                                        Lines {source.metadata?.["loc.lines.from"]}-{source.metadata?.["loc.lines.to"]}
+                                      </Badge>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(source.content)}>
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                                    {source.content}
+                                  </p>
+                                  {source.metadata?.filename && (
+                                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                      From: {source.metadata.filename}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+
+                      {/* Action buttons and metadata */}
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                        <div className="flex items-center space-x-2">
+                          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(message.content)}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <ThumbsUp className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <ThumbsDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                          {message.cached && <Badge variant="secondary">Cached</Badge>}
+                          {message.processingTime && <span>{message.processingTime}</span>}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <Card className="max-w-[80%] p-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span className="text-sm text-muted-foreground">Thinking...</span>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <div className="border-t p-4 flex-shrink-0">
         <div className="flex space-x-2">
           <Input
             value={input}
