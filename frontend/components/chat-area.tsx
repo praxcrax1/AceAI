@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Send, Copy, ThumbsUp, ThumbsDown, ChevronDown, FileText } from "lucide-react"
 import type { Document, ChatMessage } from "@/types"
+import { DocumentReader } from "@/components/document-reader"
 
 interface ChatAreaProps {
   document: Document
@@ -19,6 +20,9 @@ interface ChatAreaProps {
 export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps) {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
+  const [readerOpen, setReaderOpen] = useState(false)
+  const [readerPage, setReaderPage] = useState<number | null>(null)
+  const [readerLines, setReaderLines] = useState<{ from: number; to: number } | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const suggestedQuestions = ["Summarize the main points", "What are the key findings?", "Explain the methodology"]
@@ -91,6 +95,16 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
     navigator.clipboard.writeText(text)
   }
 
+  const handleViewSource = (source: any) => {
+    setReaderPage(source.metadata?.["loc.pageNumber"] || null)
+    setReaderLines(
+      source.metadata?.["loc.lines.from"] && source.metadata?.["loc.lines.to"]
+        ? { from: source.metadata["loc.lines.from"], to: source.metadata["loc.lines.to"] }
+        : null
+    )
+    setReaderOpen(true)
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="border-b p-4 flex-shrink-0">
@@ -149,9 +163,14 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
                                         Lines {source.metadata?.["loc.lines.from"]}-{source.metadata?.["loc.lines.to"]}
                                       </Badge>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(source.content)}>
-                                      <Copy className="h-3 w-3" />
-                                    </Button>
+                                    <div className="flex items-center space-x-1">
+                                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(source.content)}>
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleViewSource(source)}>
+                                        View PDF
+                                      </Button>
+                                    </div>
                                   </div>
                                   <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
                                     {source.content}
@@ -235,6 +254,14 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
           </div>
         )}
       </div>
+
+      <DocumentReader
+        document={document}
+        isOpen={readerOpen}
+        onClose={() => setReaderOpen(false)}
+        page={readerPage}
+        lines={readerLines}
+      />
     </div>
   )
 }

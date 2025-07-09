@@ -9,9 +9,11 @@ interface DocumentReaderProps {
   document: Document | null
   isOpen: boolean
   onClose: () => void
+  page?: number | null
+  lines?: { from: number; to: number } | null
 }
 
-export function DocumentReader({ document: doc, isOpen, onClose }: DocumentReaderProps) {
+export function DocumentReader({ document: doc, isOpen, onClose, page, lines }: DocumentReaderProps) {
   // Handle escape key to close reader
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -28,6 +30,20 @@ export function DocumentReader({ document: doc, isOpen, onClose }: DocumentReade
 
   if (!isOpen || !doc) {
     return null
+  }
+
+  // Optionally, you can use page/lines to control the iframe src or overlay highlights
+  // For now, pass page/lines as query params if the PDF viewer supports it
+  const getIframeSrc = () => {
+    if (!doc) return ""
+    let url = doc.cloudinaryUrl
+    if (page) {
+      // For PDF.js or similar viewers, #page= works
+      url += `#page=${page}`
+    }
+    // If you have a custom viewer, you can add lines as query params
+    // e.g., url += `&highlightLines=${lines?.from}-${lines?.to}`
+    return url
   }
 
   return (
@@ -53,11 +69,12 @@ export function DocumentReader({ document: doc, isOpen, onClose }: DocumentReade
           {/* Document Content */}
           <div className="flex-1 overflow-hidden">
             <iframe
-              src={doc.cloudinaryUrl}
+              src={getIframeSrc()}
               title={doc.filename}
               className="w-full h-full border-0 rounded-b-lg"
               allowFullScreen
             />
+            {/* Optionally, render a highlight overlay if you control the PDF viewer */}
           </div>
         </div>
       </div>
