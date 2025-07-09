@@ -8,7 +8,18 @@ import { ChatArea } from "@/components/chat-area"
 import { AddSourcesDialog } from "@/components/add-sources-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { Brain, Plus } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Brain, Plus, LogOut } from "lucide-react"
 import type { Document } from "@/types"
 
 export default function DashboardPage() {
@@ -81,6 +92,11 @@ export default function DashboardPage() {
     }
   }
 
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -113,9 +129,30 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center space-x-2">
           <ThemeToggle />
-          <Button variant="outline" size="sm" onClick={logout}>
-            Logout
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to logout? You will need to sign in again to access your documents and chat
+                  history.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout} className="bg-red-600 hover:bg-red-700">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </header>
 
