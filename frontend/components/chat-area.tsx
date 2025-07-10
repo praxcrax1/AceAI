@@ -43,7 +43,11 @@ export function ChatArea({ document, messages: initialMessages, onMessagesChange
           const data = await res.json()
           if (Array.isArray(data.messages)) {
             // Map LangChain messages to ChatMessage
-            const mapped = data.messages.map((msg: any, idx: number) => {
+            const mapped = data.messages.map((msg: {
+              type: string;
+              id: string[];
+              kwargs: { content: string };
+            }, idx: number): ChatMessage => {
               let role: "user" | "assistant" = "user"
               if (msg.type === "constructor" && Array.isArray(msg.id)) {
                 if (msg.id.includes("AIMessage")) role = "assistant"
@@ -60,7 +64,7 @@ export function ChatArea({ document, messages: initialMessages, onMessagesChange
             onMessagesChange(mapped)
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       } finally {
         setHistoryLoading(false)
