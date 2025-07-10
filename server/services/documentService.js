@@ -1,6 +1,9 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const config = require('../config');
 const Document = require('../models/document');
+const { Pinecone } = require('@pinecone-database/pinecone');
+
+const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
 exports.getAllDocuments = async (req, res) => {
   const userId = req.user && req.user.userId;
@@ -32,6 +35,8 @@ exports.deleteDocumentById = async (req, res) => {
   const userId = req.user && req.user.userId;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const { id } = req.params;
+  const index = pc.index(process.env.PINECONE_INDEX_NAME)
+  await index.namespace(`${userId}:${id}`).deleteAll();
   const client = new MongoClient(config.mongodb.uri);
   await client.connect();
   const db = client.db(config.mongodb.dbName);

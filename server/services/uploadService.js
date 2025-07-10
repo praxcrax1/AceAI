@@ -61,6 +61,7 @@ exports.handleFileUpload = async (req, res) => {
     await client.connect();
     const db = client.db(config.mongodb.dbName);
     const documents = db.collection('documents');
+    const currentDate = new Date();
 
     const docMeta = new Document({
       _id: fileId,
@@ -68,8 +69,8 @@ exports.handleFileUpload = async (req, res) => {
       filename: req.file.originalname,
       cloudinaryUrl: fileUrl,
       fileId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: currentDate,
+      updatedAt: currentDate,
     });
 
     await documents.insertOne(docMeta.toDocument());
@@ -81,12 +82,12 @@ exports.handleFileUpload = async (req, res) => {
       { _id: fileId },
       { $set: {
           pageCount: processResult.pageCount,
-          processedAt: new Date(),
+          processedAt: currentDate,
         }
       }
     );
 
-    res.json({ success: true, fileId, fileUrl });
+    res.json({ success: true, fileId, fileUrl, pageCount: processResult.pageCount, createdAt: currentDate, proccessedAt: currentDate, updatedAt: currentDate });
   } catch (err) {
     console.error('❌ File upload error:', err);
     res.status(500).json({ error: err.message });
@@ -102,7 +103,8 @@ exports.handleLinkUpload = async (req, res) => {
   const client = new MongoClient(config.mongodb.uri);
   try {
     const userId = req.user?.userId;
-    const { url, filename } = req.body;
+    const { url } = req.body;
+    const filename = url.split('/').pop() || 'remote.pdf';
 
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     if (!url || typeof url !== 'string') return res.status(400).json({ error: 'Invalid URL' });
@@ -127,17 +129,18 @@ exports.handleLinkUpload = async (req, res) => {
 
     // Process the PDF from the remote link
     const processResult = await pdfProcessor.processPDF(url, `${userId}:${fileId}`, fileId, filename || 'remote.pdf');
+    const currentDate = new Date();
 
     await documents.updateOne(
       { _id: fileId },
       { $set: {
           pageCount: processResult.pageCount,
-          processedAt: new Date(),
+          processedAt: currentDate,
         }
       }
     );
 
-    res.json({ success: true, fileId, fileUrl: url });
+    res.json({ success: true, fileId, fileUrl: url, pageCount: processResult.pageCount, createdAt: currentDate, proccessedAt: currentDate, updatedAt: currentDate });
   } catch (err) {
     console.error('❌ Link upload error:', err);
     res.status(500).json({ error: err.message });
