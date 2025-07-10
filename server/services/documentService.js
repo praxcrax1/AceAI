@@ -1,16 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const { Pinecone } = require('@pinecone-database/pinecone');
-const logger = require('../utils/logger');
-const documentStore = require('../utils/documentStore');
-const metrics = require('../utils/metrics');
-const { AppError } = require('../utils/errorHandler');
 const { MongoClient, ObjectId } = require('mongodb');
 const config = require('../config');
 const Document = require('../models/document');
-
-// Service for document management (list, get, delete, update)
-// ...to be implemented: logic will be moved from routes/documents.js
 
 exports.getAllDocuments = async (req, res) => {
   const userId = req.user && req.user.userId;
