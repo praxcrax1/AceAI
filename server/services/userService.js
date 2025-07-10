@@ -22,9 +22,10 @@ exports.register = async (req, res) => {
   if (existing) return res.status(409).json({ error: 'User already exists' });
   const hash = await bcrypt.hash(password, 10);
   const user = new User({ email, password: hash, createdAt: new Date() });
-  await users.insertOne(user.toDocument());
+  const result = await users.insertOne(user.toDocument());
+  user._id = result.insertedId;
   const token = jwt.sign({ userId: user._id, email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, userId: user._id });
+  res.json({ token, user: { id: user._id, email: user.email } });
 };
 
 exports.login = async (req, res) => {
@@ -37,7 +38,7 @@ exports.login = async (req, res) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
   const token = jwt.sign({ userId: user._id, email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, userId: user._id });
+  res.json({ token, user: { id: user._id, email: user.email } });
 };
 
 exports.authMiddleware = async (req, res, next) => {
