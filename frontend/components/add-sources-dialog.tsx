@@ -30,8 +30,8 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
       return
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File size must be less than 10MB")
+    if (file.size > 100 * 1024 * 1024) {
+      setError("File size must be less than 100MB")
       return
     }
 
@@ -172,7 +172,7 @@ export function AddSourcesDialog({ open, onOpenChange, onDocumentUpload }: AddSo
                     upload
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground">Supported file types: PDF (max 10MB)</p>
+                <p className="text-sm text-muted-foreground">Supported file types: PDF (max 100MB)</p>
               </div>
 
               <input
