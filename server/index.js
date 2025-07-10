@@ -81,6 +81,9 @@ app.use(errorHandler);
 // Create HTTP server
 const server = http.createServer(app);
 
+// Set server timeout to 10 minutes (600000 ms) for large uploads
+server.setTimeout(600000);
+
 // Setup graceful shutdown
 setupGracefulShutdown(server, {
   timeout: 30000,
