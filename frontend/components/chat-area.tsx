@@ -17,14 +17,58 @@ interface ChatAreaProps {
   onMessagesChange: (messages: ChatMessage[]) => void
 }
 
-export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps) {
+export function ChatArea({ document, messages: initialMessages, onMessagesChange }: ChatAreaProps) {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [readerOpen, setReaderOpen] = useState(false)
   const [readerPage, setReaderPage] = useState<number | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
+  const [historyLoading, setHistoryLoading] = useState(true)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const suggestedQuestions = ["Summarize the main points", "What are the key findings?", "Explain the methodology"]
+
+  // Fetch chat history on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setHistoryLoading(true)
+      try {
+        const sessionId = `${document.userId}:${document.fileId}`
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/chat/history?sessionId=${encodeURIComponent(sessionId)}&limit=20`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.messages)) {
+            // Map LangChain messages to ChatMessage
+            const mapped = data.messages.map((msg: any, idx: number) => {
+              let role: "user" | "assistant" = "user"
+              if (msg.type === "constructor" && Array.isArray(msg.id)) {
+                if (msg.id.includes("AIMessage")) role = "assistant"
+                else if (msg.id.includes("HumanMessage")) role = "user"
+              }
+              return {
+                id: idx.toString(),
+                content: msg.kwargs?.content || "",
+                role,
+                timestamp: new Date(),
+              }
+            })
+            setMessages(mapped)
+            onMessagesChange(mapped)
+          }
+        }
+      } catch (e) {
+        // ignore
+      } finally {
+        setHistoryLoading(false)
+      }
+    }
+    fetchHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document.fileId, document.userId])
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -46,6 +90,7 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
     }
 
     const newMessages = [...messages, userMessage]
+    setMessages(newMessages)
     onMessagesChange(newMessages)
     setInput("")
     setLoading(true)
@@ -77,6 +122,7 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
           cached: data.cached,
         }
 
+        setMessages([...newMessages, assistantMessage])
         onMessagesChange([...newMessages, assistantMessage])
       }
     } catch (error) {
@@ -111,7 +157,9 @@ export function ChatArea({ document, messages, onMessagesChange }: ChatAreaProps
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           <div className="space-y-4 p-4">
-            {messages.length === 0 && (
+            {historyLoading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading chat history...</div>
+            ) : messages.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-muted-foreground mb-4">Start a conversation about &quot;{document.filename}&quot;</p>
                 <div className="flex flex-wrap gap-2 justify-center">

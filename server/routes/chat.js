@@ -11,7 +11,7 @@ const { authMiddleware } = require('../services/userService');
 router.post('/chat', chatLimiter, authMiddleware, async (req, res) => {
   const startTime = Date.now();
   try {
-    const { question, sessionId, fileId } = req.body;
+    const { question, fileId } = req.body;
     const userId = req.user.userId;
 
     // Validate required fields
@@ -61,6 +61,23 @@ router.post('/chat', chatLimiter, authMiddleware, async (req, res) => {
       error: 'Failed to process question',
       details: error.message
     });
+  }
+});
+
+// Route for fetching chat history for a session
+router.get('/chat/history', authMiddleware, async (req, res) => {
+  try {
+    const { sessionId, limit } = req.query;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+    // Default limit to 20 messages (10 exchanges)
+    const messageLimit = limit ? parseInt(limit) : 20;
+    const messages = await chatService.getConversationHistory(sessionId, messageLimit / 2);
+    res.json({ sessionId, messages });
+  } catch (error) {
+    logger.error('Error fetching chat history:', error);
+    res.status(500).json({ error: 'Failed to fetch chat history', details: error.message });
   }
 });
 
