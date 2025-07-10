@@ -23,7 +23,7 @@ router.post('/chat', chatLimiter, authMiddleware, async (req, res) => {
     }
 
     // Use userId in session and Pinecone namespace
-    const chatSessionId = sessionId || `${userId}:${uuidv4()}`;
+    const chatSessionId = `${userId}:${fileId}`;
     
     logger.info(`Processing question for session ${chatSessionId} on document ${fileId}: "${question.substring(0, 100)}${question.length > 100 ? '...' : ''}"`);
 

@@ -10,9 +10,9 @@ module.exports = {
   
   // LLM configuration
   llm: {
-    modelName: 'gemini-2.0-flash',
+    modelName: 'gemini-2.5-flash',
     maxOutputTokens: 2048,
-    temperature: 0.3,
+    temperature: 0.5,
   },
   
   // Embeddings configuration

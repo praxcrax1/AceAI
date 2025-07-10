@@ -9,7 +9,10 @@ const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 const { AppError } = require('../utils/errorHandler');
 const mongoDBClient = require('../utils/mongodb');
-const { ChatPromptTemplate, MessagesPlaceholder } = require("@langchain/core/prompts");
+const { 
+  ChatPromptTemplate, 
+  MessagesPlaceholder,
+} = require("@langchain/core/prompts");
 
 class ChatService {
   constructor() {
@@ -26,10 +29,7 @@ class ChatService {
     if (this.mongoInitialized) return;
     
     try {
-      // Connect to MongoDB
       await mongoDBClient.connect();
-      
-      // Create indexes for better performance
       await mongoDBClient.createIndexes();
       
       this.mongoInitialized = true;
@@ -56,9 +56,17 @@ class ChatService {
       console.log(`Initializing LLM with model: ${config.llm.modelName}`);
       this.llm = new ChatGoogleGenerativeAI({
         apiKey: apiKey,
-        model: config.llm.modelName, // Using model instead of modelName
+        model: config.llm.modelName,
         maxOutputTokens: config.llm.maxOutputTokens,
         temperature: config.llm.temperature,
+      });
+      
+      // Create a separate LLM instance for query contextualization
+      this.queryLLM = new ChatGoogleGenerativeAI({
+        apiKey: apiKey,
+        model: config.llm.modelName,
+        maxOutputTokens: 200, // Shorter responses for query generation
+        temperature: 0.1, // Lower temperature for more focused queries
       });
       
       console.log('LLM initialized successfully');
@@ -72,12 +80,10 @@ class ChatService {
     if (this.pineconeClient) return;
 
     try {
-      // Initialize Pinecone client with v6 API
       this.pineconeClient = new Pinecone({
         apiKey: process.env.PINECONE_API_KEY,
       });
 
-      // Get the index (note the lowercase 'index' method)
       this.pineconeIndex = this.pineconeClient.index(process.env.PINECONE_INDEX_NAME);
       console.log('Pinecone initialized successfully');
     } catch (error) {
@@ -96,22 +102,23 @@ class ChatService {
           collection,
           sessionId: sessionId,
         });
+        
+        // Fixed: Use consistent keys and proper memory configuration
         const memory = new BufferMemory({
           chatHistory: messageHistory,
           memoryKey: 'chat_history',
           returnMessages: true,
-          inputKey: 'question',
-          outputKey: 'text',
+          // Remove inputKey and outputKey to use default behavior
         });
+        
         this.sessionMemory.set(sessionId, memory);
       }
       return this.sessionMemory.get(sessionId);
     } catch (error) {
+      logger.warn('Falling back to in-memory chat history due to MongoDB error:', error);
       const fallbackMemory = new BufferMemory({
         memoryKey: 'chat_history',
         returnMessages: true,
-        inputKey: 'question',
-        outputKey: 'text',
       });
       this.sessionMemory.set(sessionId, fallbackMemory);
       return fallbackMemory;
@@ -119,15 +126,161 @@ class ChatService {
   }
 
   /**
+   * Save conversation to memory - Fixed implementation
+   */
+  async saveToMemory(memory, humanMessage, aiMessage) {
+    try {
+      if (memory && memory.chatHistory) {
+        // Add messages directly to chat history
+        await memory.chatHistory.addUserMessage(humanMessage);
+        await memory.chatHistory.addAIMessage(aiMessage);
+        logger.debug('Successfully saved conversation to memory');
+      }
+    } catch (error) {
+      logger.error('Error saving to memory:', error);
+      // Don't throw error, just log it so conversation can continue
+    }
+  }
+
+  /**
+   * Generate a contextualized query based on chat history
+   * This is crucial for handling follow-up questions that reference previous context
+   */
+  async contextualizeQuery(question, chatHistory) {
+    if (!chatHistory || chatHistory.length === 0) {
+      return question;
+    }
+
+    // Create a prompt template for query contextualization
+    const contextualizePrompt = ChatPromptTemplate.fromMessages([
+      ["system", `Given a chat history and the latest user question which might reference context in the chat history, 
+        formulate a standalone question which can be understood without the chat history. 
+        Do NOT answer the question, just reformulate it if needed and otherwise return it as is.
+        
+        Examples:
+        Chat History: [Human: "What is task decomposition?", AI: "Task decomposition is breaking down complex tasks into smaller, manageable steps."]
+        Follow-up Question: "What are common ways of doing it?"
+        Standalone Question: "What are common ways of doing task decomposition?"
+        
+        Chat History: [Human: "Tell me about machine learning", AI: "Machine learning is a subset of AI..."]
+        Follow-up Question: "How does it work?"
+        Standalone Question: "How does machine learning work?"
+        
+        Chat History: [Human: "My name is John", AI: "Nice to meet you, John!"]
+        Follow-up Question: "Do you remember my name?"
+        Standalone Question: "Do you remember my name from our conversation?"`],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "Question: {question}"]
+    ]);
+
+    try {
+      const messages = await contextualizePrompt.formatMessages({
+        chat_history: chatHistory,
+        question: question
+      });
+
+      const response = await this.queryLLM.invoke(messages);
+      const contextualizedQuery = response.content.trim();
+      
+      logger.debug(`Original question: "${question}"`);
+      logger.debug(`Contextualized query: "${contextualizedQuery}"`);
+      
+      return contextualizedQuery;
+    } catch (error) {
+      logger.error('Error contextualizing query:', error);
+      return question; // Fallback to original question
+    }
+  }
+
+  /**
+   * Enhanced routing that better handles conversational context
+   */
+  async shouldRetrieveDocuments(question, chatHistory) {
+    const routingPrompt = ChatPromptTemplate.fromMessages([
+      ["system", `You are an expert at routing user questions to the appropriate handler.
+        
+        Given a user question and chat history, determine if it requires searching through documents to answer,
+        or if it can be answered directly as a general conversation.
+        
+        Questions that need document retrieval:
+        - Specific questions about document content, data, or information
+        - Questions asking for facts that would be in documents
+        - Follow-up questions that build on previous document-based answers
+        - Technical questions that require specific information
+        
+        Questions that don't need document retrieval:
+        - General greetings ("hello", "hi", "how are you")
+        - Personal introductions ("my name is...", "I'm...")
+        - General conversation ("thank you", "goodbye")
+        - Questions about names, personal details shared in conversation
+        - Questions about your capabilities or memory
+        - Simple clarification requests
+        - Questions about previous conversation context (like "do you remember my name?")
+        
+        IMPORTANT: If the question is about remembering personal details, names, or conversation context,
+        this should be answered directly from chat history, not from documents.
+        
+        Respond with only "RETRIEVE" or "DIRECT"`],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "Question: {question}"]
+    ]);
+
+    try {
+      const messages = await routingPrompt.formatMessages({
+        chat_history: chatHistory.slice(-6), // Use more history for better context
+        question: question
+      });
+
+      const response = await this.queryLLM.invoke(messages);
+      const decision = response.content.trim().toUpperCase();
+      
+      logger.debug(`Routing decision for "${question}": ${decision}`);
+      return decision === "RETRIEVE";
+    } catch (error) {
+      logger.error('Error in routing decision:', error);
+      return false; // Default to direct response when in doubt
+    }
+  }
+
+  /**
+   * Generate a direct response without document retrieval - Enhanced for memory
+   */
+  async generateDirectResponse(question, chatHistory) {
+    const directPrompt = ChatPromptTemplate.fromMessages([
+      ["system", `You are a helpful assistant with excellent memory of our conversation. 
+        Use the chat history to maintain context and remember personal details like names, 
+        preferences, and previous topics discussed.
+        
+        Guidelines:
+        - Remember and use names and personal details shared in conversation
+        - Reference previous topics when relevant
+        - Be conversational and friendly
+        - If asked about remembering something, check the chat history carefully
+        - Keep responses concise but warm and personal`],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "{question}"]
+    ]);
+
+    const messages = await directPrompt.formatMessages({
+      chat_history: chatHistory,
+      question: question
+    });
+
+    const response = await this.llm.invoke(messages);
+    return {
+      answer: response.content,
+      sources: [],
+      requiresRetrieval: false
+    };
+  }
+
+  /**
    * Clear chat history for a specific session
-   * @param {string} sessionId - The ID of the session to clear
-   * @returns {Promise<boolean>} - True if successful, false otherwise
    */
   async clearChatHistory(sessionId) {
     try {
       logger.debug(`Clearing chat history for session: ${sessionId}`);
       
-      // Ensure MongoDB is initialized
       await this.initMongoDB();
       
       // Remove from in-memory cache
@@ -149,64 +302,137 @@ class ChatService {
   async processQuestion(question, sessionId, fileId) {
     const userId = sessionId.split(':')[0];
     const pineconeNamespace = `${userId}:${fileId}`;
+    
     try {
-      let vectorStore = cache.get(`vectorstore:${pineconeNamespace}`);
-      if (!vectorStore) {
-        await this.initPinecone();
-        await this.initMongoDB();
-        try {
-          vectorStore = await PineconeStore.fromExistingIndex(
-            this.embeddings,
-            {
-              pineconeIndex: this.pineconeIndex,
-              namespace: pineconeNamespace,
-            }
-          );
-          cache.set(`vectorstore:${pineconeNamespace}`, vectorStore, 900);
-        } catch (error) {
-          throw new AppError(
-            `No document found with ID: ${fileId}. Please upload a document first.`,
-            404,
-            { fileId }
-          );
-        }
-      }
-      const retriever = vectorStore.asRetriever({
-        searchType: 'similarity',
-        searchKwargs: { k: config.vectorSearch.topK },
-      });
+      // Get memory and chat history
       const memory = await this.getOrCreateMemory(sessionId);
-      let chatHistoryMessages = [];
-      if (memory && typeof memory.chatHistory?.getMessages === 'function') {
-        chatHistoryMessages = await memory.chatHistory.getMessages();
+      let chatHistory = [];
+      
+      if (memory && memory.chatHistory && typeof memory.chatHistory.getMessages === 'function') {
+        chatHistory = await memory.chatHistory.getMessages();
       }
-      const relevantDocs = await retriever.getRelevantDocuments(question);
-      const context = relevantDocs.map(doc => doc.pageContent).join("\n---\n");
-      const prompt = ChatPromptTemplate.fromMessages([
-        ["system", "You are a helpful assistant for answering questions about a document. Use the provided context to answer. If you don't know, say so."],
-        new MessagesPlaceholder("history"),
-        ["user", "Context:\n{context}\n\nQuestion: {question}"]
-      ]);
-      const promptInput = {
-        history: chatHistoryMessages,
-        context,
-        question
-      };
-      const messages = await prompt.formatMessages(promptInput);
-      const response = await this.llm.invoke(messages);
-      if (memory && typeof memory.saveContext === 'function') {
-        await memory.saveContext({ question }, { text: response.content });
+
+      // Check if we need to retrieve documents
+      const needsRetrieval = await this.shouldRetrieveDocuments(question, chatHistory);
+      
+      let answer, sources = [], requiresRetrieval = false, contextualizedQuery = null;
+
+      if (!needsRetrieval) {
+        logger.debug('Generating direct response without document retrieval');
+        const directResponse = await this.generateDirectResponse(question, chatHistory);
+        answer = directResponse.answer;
+        sources = directResponse.sources;
+        requiresRetrieval = directResponse.requiresRetrieval;
+      } else {
+        logger.debug('Processing question with document retrieval');
+        
+        // Contextualize the query for better retrieval
+        contextualizedQuery = await this.contextualizeQuery(question, chatHistory);
+        
+        // Get or create vector store
+        let vectorStore = cache.get(`vectorstore:${pineconeNamespace}`);
+        if (!vectorStore) {
+          await this.initPinecone();
+          await this.initMongoDB();
+          try {
+            vectorStore = await PineconeStore.fromExistingIndex(
+              this.embeddings,
+              {
+                pineconeIndex: this.pineconeIndex,
+                namespace: pineconeNamespace,
+              }
+            );
+            cache.set(`vectorstore:${pineconeNamespace}`, vectorStore, 900);
+          } catch (error) {
+            throw new AppError(
+              `No document found with ID: ${fileId}. Please upload a document first.`,
+              404,
+              { fileId }
+            );
+          }
+        }
+
+        // Retrieve relevant documents using contextualized query
+        const retriever = vectorStore.asRetriever({
+          searchType: 'similarity',
+          searchKwargs: { k: config.vectorSearch.topK },
+        });
+
+        const relevantDocs = await retriever.getRelevantDocuments(contextualizedQuery);
+        const context = relevantDocs.map(doc => doc.pageContent).join("\n---\n");
+
+        // Create enhanced prompt with better context integration
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", `You are a helpful assistant for answering questions about documents. 
+            You also have excellent memory of our conversation and can remember personal details.
+            
+            Use the provided context to answer the user's question accurately and comprehensively.
+            Also use the chat history to maintain conversational context and remember personal details.
+            
+            Guidelines:
+            - Base your answer primarily on the provided context for document questions
+            - Remember and use names and personal details from chat history
+            - If the context doesn't contain enough information, say so clearly
+            - Reference specific parts of the context when relevant
+            - Maintain conversation flow by acknowledging previous exchanges when appropriate
+            - Keep responses concise but informative and personal
+            - If asked about something not in the context, politely state that the information isn't available in the current document
+            
+            Context:
+            {context}`],
+          new MessagesPlaceholder("chat_history"),
+          ["human", "{question}"]
+        ]);
+
+        const messages = await prompt.formatMessages({
+          context: context,
+          chat_history: chatHistory,
+          question: question
+        });
+
+        const response = await this.llm.invoke(messages);
+        answer = response.content;
+        
+        sources = relevantDocs.map(doc => ({
+          content: doc.pageContent,
+          metadata: doc.metadata,
+        })).slice(0, 3);
+        
+        requiresRetrieval = true;
       }
-      const sources = relevantDocs.map(doc => ({
-        content: doc.pageContent,
-        metadata: doc.metadata,
-      }));
+
+      // Save conversation to memory using the fixed method
+      await this.saveToMemory(memory, question, answer);
+
       return {
-        answer: response.content,
-        sources: sources.slice(0, 3),
+        answer: answer,
+        sources: sources,
+        requiresRetrieval: requiresRetrieval,
+        contextualizedQuery: contextualizedQuery !== question ? contextualizedQuery : null
       };
+
     } catch (error) {
+      logger.error('Error processing question:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Get conversation history for a session
+   */
+  async getConversationHistory(sessionId, limit = 10) {
+    try {
+      const memory = await this.getOrCreateMemory(sessionId);
+      
+      if (memory && memory.chatHistory && typeof memory.chatHistory.getMessages === 'function') {
+        const messages = await memory.chatHistory.getMessages();
+        return messages.slice(-limit * 2); // Get last N exchanges (question + answer pairs)
+      }
+      
+      return [];
+    } catch (error) {
+      logger.error('Error retrieving conversation history:', error);
+      return [];
     }
   }
   
