@@ -1,4 +1,3 @@
-// uploadService.js
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const pdfProcessor = require('./pdfProcessor');
@@ -11,7 +10,7 @@ const Document = require('../models/document');
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 // Multer config: only PDFs, max 10MB
@@ -21,11 +20,14 @@ const upload = multer({
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Only PDF files are allowed!'), false);
   },
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 } // 100 MB
 });
 
 exports.upload = upload;
 
+/**
+ * Helper: Upload buffer to Cloudinary
+ */
 const uploadToCloudinary = (buffer, fileName) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -39,6 +41,9 @@ const uploadToCloudinary = (buffer, fileName) =>
     stream.end(buffer);
   });
 
+/**
+ * Handler: Local file upload
+ */
 exports.handleFileUpload = async (req, res) => {
   const client = new MongoClient(config.mongodb.uri);
   try {
@@ -49,18 +54,14 @@ exports.handleFileUpload = async (req, res) => {
     const fileId = uuidv4();
     const fileName = `${userId}/${fileId}.pdf`;
 
-    // Parallel upload & processing
-    const [uploadResult, processResult] = await Promise.all([
-      uploadToCloudinary(req.file.buffer, fileName),
-      pdfProcessor.processPDF(req.file.buffer, `${userId}:${fileId}`, fileId, req.file.originalname, true),
-    ]);
-
+    // Upload to Cloudinary
+    const uploadResult = await uploadToCloudinary(req.file.buffer, fileName);
     const fileUrl = uploadResult.secure_url;
-    const currentDate = new Date();
 
     await client.connect();
     const db = client.db(config.mongodb.dbName);
     const documents = db.collection('documents');
+    const currentDate = new Date();
 
     const docMeta = new Document({
       _id: fileId,
@@ -68,15 +69,25 @@ exports.handleFileUpload = async (req, res) => {
       filename: req.file.originalname,
       cloudinaryUrl: fileUrl,
       fileId,
-      pageCount: processResult.pageCount,
-      processedAt: currentDate,
       createdAt: currentDate,
       updatedAt: currentDate,
     });
 
     await documents.insertOne(docMeta.toDocument());
 
-    res.json({ success: true, fileId, fileUrl, pageCount: processResult.pageCount, createdAt: currentDate, processedAt: currentDate, updatedAt: currentDate });
+    // Process the PDF
+    const processResult = await pdfProcessor.processPDF(fileUrl, `${userId}:${fileId}`, fileId, req.file.originalname);
+
+    await documents.updateOne(
+      { _id: fileId },
+      { $set: {
+          pageCount: processResult.pageCount,
+          processedAt: currentDate,
+        }
+      }
+    );
+
+    res.json({ success: true, fileId, fileUrl, pageCount: processResult.pageCount, createdAt: currentDate, proccessedAt: currentDate, updatedAt: currentDate });
   } catch (err) {
     console.error('❌ File upload error:', err);
     res.status(500).json({ error: err.message });
@@ -85,6 +96,9 @@ exports.handleFileUpload = async (req, res) => {
   }
 };
 
+/**
+ * Handler: Link-based PDF upload
+ */
 exports.handleLinkUpload = async (req, res) => {
   const client = new MongoClient(config.mongodb.uri);
   try {
@@ -96,29 +110,37 @@ exports.handleLinkUpload = async (req, res) => {
     if (!url || typeof url !== 'string') return res.status(400).json({ error: 'Invalid URL' });
 
     const fileId = uuidv4();
-    const currentDate = new Date();
 
     await client.connect();
     const db = client.db(config.mongodb.dbName);
     const documents = db.collection('documents');
 
-    const processResult = await pdfProcessor.processPDF(url, `${userId}:${fileId}`, fileId, filename);
-
     const docMeta = new Document({
       _id: fileId,
       userId: new ObjectId(userId),
-      filename,
-      cloudinaryUrl: url,
+      filename: filename || 'remote.pdf',
+      cloudinaryUrl: url, // Store original URL as the source
       fileId,
-      pageCount: processResult.pageCount,
-      processedAt: currentDate,
-      createdAt: currentDate,
-      updatedAt: currentDate,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     await documents.insertOne(docMeta.toDocument());
 
-    res.json({ success: true, fileId, fileUrl: url, pageCount: processResult.pageCount, createdAt: currentDate, processedAt: currentDate, updatedAt: currentDate });
+    // Process the PDF from the remote link
+    const processResult = await pdfProcessor.processPDF(url, `${userId}:${fileId}`, fileId, filename || 'remote.pdf');
+    const currentDate = new Date();
+
+    await documents.updateOne(
+      { _id: fileId },
+      { $set: {
+          pageCount: processResult.pageCount,
+          processedAt: currentDate,
+        }
+      }
+    );
+
+    res.json({ success: true, fileId, fileUrl: url, pageCount: processResult.pageCount, createdAt: currentDate, proccessedAt: currentDate, updatedAt: currentDate });
   } catch (err) {
     console.error('❌ Link upload error:', err);
     res.status(500).json({ error: err.message });
