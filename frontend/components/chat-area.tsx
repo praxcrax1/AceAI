@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import ReactMarkdown from "react-markdown"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -181,7 +182,11 @@ export function ChatArea({ document, messages: initialMessages, onMessagesChange
                 <Card
                   className={`max-w-[80%] p-4 ${message.role === "user" ? "bg-primary text-primary-foreground" : ""}`}
                 >
-                  <div className="prose prose-sm max-w-none whitespace-pre-wrap">{message.content}</div>
+                  {message.role === "assistant" ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    <div className="prose prose-sm max-w-none whitespace-pre-wrap">{message.content}</div>
+                  )}
 
                   {message.role === "assistant" && (
                     <>
