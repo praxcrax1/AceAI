@@ -188,7 +188,7 @@ class ChatService {
     const searchTool = this.createSearchDocumentTool(vectorStore);
     const tools = [searchTool];
 
-    // Create a prompt that enforces tool usage and comprehensive responses
+    // Create a prompt that enforces tool usage, comprehensive responses, and Markdown formatting
     const prompt = ChatPromptTemplate.fromMessages([
       ["system", `You are a helpful AI assistant that answers questions by searching through uploaded documents.
 
@@ -199,13 +199,21 @@ class ChatService {
           - Your general knowledge to provide context and completeness
           - Clear indication of what information comes from where
 
+        RESPONSE FORMAT (MANDATORY):
+        - ALWAYS return your entire response in valid Markdown format.
+        - Use **bold** for all titles, headings, and main keywords or important terms.
+        - Use Markdown headings (e.g., #, ##, ###) for sections and titles, and bold for emphasis.
+        - If you provide a list, use Markdown bullet points and bold the key terms.
+        - If you include code, use Markdown code blocks.
+        - Never return plain text or HTML, only Markdown.
+
         Response Guidelines:
         - If search finds relevant content (good similarity scores): Use it as the primary source and supplement with your knowledge
         - If search finds low similarity content: Acknowledge what was found but rely more on your general knowledge
         - If search finds no results: Use your general knowledge while noting the document doesn't contain this information
         - Always aim to be maximally helpful regardless of search results
 
-        Be conversational, comprehensive, and transparent about your sources.`],
+        Be conversational, comprehensive, and transparent about your sources. ALWAYS use Markdown formatting as described above.`],
       new MessagesPlaceholder("chat_history"),
       ["human", "{input}"],
       new MessagesPlaceholder("agent_scratchpad"),
