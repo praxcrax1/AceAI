@@ -348,6 +348,27 @@ class ChatService {
     }
   }
 
+    /**
+   * Gracefully shutdown connections and resources
+   */
+  async shutdown() {
+    logger.info('Shutting down chat service...');
+    
+    // Clear in-memory session cache
+    this.sessionMemory.clear();
+    
+    // Close MongoDB connection if it was initialized
+    if (this.mongoInitialized) {
+      try {
+        await mongoDBClient.close();
+        logger.info('MongoDB connection closed');
+      } catch (error) {
+        logger.error('Error closing MongoDB connection:', error);
+      }
+    }
+    
+    logger.info('Chat service shutdown complete');
+  }
 }
 
 module.exports = new ChatService();
